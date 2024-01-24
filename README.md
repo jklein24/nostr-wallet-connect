@@ -105,19 +105,19 @@ const nwc = new webln.NWC();
 await nwc.initNWC({name: 'myapp'});
 ````
 
-## Help
+## ❓️ Help
 
-If you need help contact support@getalby.com or reach out on Nostr: npub1getal6ykt05fsz5nqu4uld09nfj3y3qxmv8crys4aeut53unfvlqr80nfm
-You can also visit the chat of our Community on [Telegram](https://t.me/getalby).
+ - [Discord Community](https://discord.gg/yT7fu2prVt)
+ - [Nostr](https://nostr.at/npub1getal6ykt05fsz5nqu4uld09nfj3y3qxmv8crys4aeut53unfvlqr80nfm)
+ - [Email](mailto:support@getalby.com) 
+ - [Telegram](https://t.me/getalby)
 
-
-## ⚡️Donations
+## ⚡️ Donations
 
 Want to support the work on Alby?
 
 Support the Alby team ⚡️hello@getalby.com
 You can also contribute to our [bounty program](https://github.com/getAlby/lightning-browser-extension/wiki/Bounties): ⚡️bounties@getalby.com
-
 
 ## NIP-47 Supported Methods
 
