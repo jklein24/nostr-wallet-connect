@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"github.com/lightsparkdev/go-sdk/objects"
-	"github.com/lightsparkdev/go-sdk/services"
-	"github.com/lightsparkdev/go-sdk/utils"
 	"math"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/lightsparkdev/go-sdk/objects"
+	"github.com/lightsparkdev/go-sdk/services"
+	"github.com/lightsparkdev/go-sdk/utils"
 
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 
@@ -165,26 +166,9 @@ func (svc *LightsparkService) LookupInvoice(ctx context.Context, senderPubkey st
 		return nil, errors.New("Payment hash must be 32 bytes hex")
 	}
 
-	// TODO: Add a lookup query by payment hash.
-	account, err := svc.client.GetCurrentAccount()
+	invoice, err := svc.client.FetchInvoiceByPaymentHash(paymentHash)
 	if err != nil {
 		return nil, err
-	}
-	numInvoices := int64(50)
-	invoices, err := account.GetPaymentRequests(svc.client.Requester, &numInvoices, nil, nil, nil, nil, &svc.nodeId)
-	if err != nil {
-		return nil, err
-	}
-	var invoice *objects.Invoice
-	for _, pr := range invoices.Entities {
-		inv, ok := pr.(objects.Invoice)
-		if !ok {
-			continue
-		}
-		if inv.Data.PaymentHash == paymentHash {
-			invoice = &inv
-			break
-		}
 	}
 	if invoice == nil {
 		return nil, errors.New("invoice not found")
@@ -264,7 +248,12 @@ func (svc *LightsparkService) getNode() (*objects.LightsparkNode, error) {
 
 func NewLightsparkService(ctx context.Context, svc *Service, e *echo.Echo) (result *LightsparkService, err error) {
 	svc.Logger.Infof("Connecting to Lightspark account - %s", svc.cfg.LightsparkBaseUrl)
-	lightsparkClient := services.NewLightsparkClient(svc.cfg.LightsparkClientId, svc.cfg.LightsparkClientSecret, &svc.cfg.LightsparkBaseUrl)
+	lightsparkClient := services.NewLightsparkClient(
+		svc.cfg.LightsparkClientId,
+		svc.cfg.LightsparkClientSecret,
+		&svc.cfg.LightsparkBaseUrl,
+		services.WithContext(ctx),
+	)
 	account, err := lightsparkClient.GetCurrentAccount()
 	if err != nil {
 		return nil, err
@@ -363,7 +352,7 @@ func (svc *LightsparkService) lightsparkInvoiceToNip47(invoice objects.Invoice) 
 	expiresAt := invoice.Data.ExpiresAt.Unix()
 	return &Nip47Transaction{
 		Type:            "incoming",
-		Invoice:         invoice.Data.PaymentHash,
+		Invoice:         invoice.Data.EncodedPaymentRequest,
 		Description:     bolt11.Description,
 		DescriptionHash: bolt11.DescriptionHash,
 		Preimage:        "",
