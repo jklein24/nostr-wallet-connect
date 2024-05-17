@@ -1,9 +1,10 @@
 package main
 
 const (
-	AlbyBackendType = "ALBY"
-	LNDBackendType  = "LND"
-	CookieName      = "alby_nwc_session"
+	AlbyBackendType       = "ALBY"
+	LNDBackendType        = "LND"
+	LightsparkBackendType = "LIGHTSPARK"
+	CookieName            = "alby_nwc_session"
 )
 
 type Config struct {
@@ -13,6 +14,11 @@ type Config struct {
 	ClientPubkey            string `envconfig:"CLIENT_NOSTR_PUBKEY"`
 	Relay                   string `envconfig:"RELAY" default:"wss://relay.getalby.com/v1"`
 	PublicRelay             string `envconfig:"PUBLIC_RELAY"`
+	LightsparkBaseUrl       string `envconfig:"LIGHTSPARK_NWC_BASE_URL" default:"https://api.lightspark.com/graphql/server/2023-09-13"`
+	LightsparkClientId      string `envconfig:"LIGHTSPARK_CLIENT_ID"`
+	LightsparkClientSecret  string `envconfig:"LIGHTSPARK_CLIENT_SECRET"`
+	LightsparkNodeId        string `envconfig:"LIGHTSPARK_NODE_ID"`
+	LightsparkNodePassword  string `envconfig:"LIGHTSPARK_NWC_NODE_PASSWORD"`
 	LNBackendType           string `envconfig:"LN_BACKEND_TYPE" default:"ALBY"`
 	LNDAddress              string `envconfig:"LND_ADDRESS"`
 	LNDCertFile             string `envconfig:"LND_CERT_FILE"`

@@ -153,6 +153,12 @@ func main() {
 			svc.Logger.Fatal(err)
 		}
 		svc.lnClient = oauthService
+	case LightsparkBackendType:
+		lightsparkService, err := NewLightsparkService(ctx, svc, e)
+		if err != nil {
+			svc.Logger.Fatal(err)
+		}
+		svc.lnClient = lightsparkService
 	}
 
 	//register shared routes
