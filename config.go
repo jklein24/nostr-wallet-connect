@@ -4,7 +4,8 @@ const (
 	AlbyBackendType       = "ALBY"
 	LNDBackendType        = "LND"
 	LightsparkBackendType = "LIGHTSPARK"
-	CookieName            = "alby_nwc_session"
+	UmaBackendType        = "UMA"
+	CookieName            = "nwc_session"
 )
 
 type Config struct {
@@ -34,5 +35,7 @@ type Config struct {
 	DatabaseMaxConns        int    `envconfig:"DATABASE_MAX_CONNS" default:"10"`
 	DatabaseMaxIdleConns    int    `envconfig:"DATABASE_MAX_IDLE_CONNS" default:"5"`
 	DatabaseConnMaxLifetime int    `envconfig:"DATABASE_CONN_MAX_LIFETIME" default:"1800"` // 30 minutes
+	UmaAPIURL               string `envconfig:"UMA_API_URL" default:"http://localhost:5000/umanwc"`
+	UmaLoginUrl             string `envconfig:"UMA_LOGIN_URL"`
 	IdentityPubkey          string
 }

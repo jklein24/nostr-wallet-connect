@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"github.com/getAlby/nostr-wallet-connect/nip47"
 	"math"
 	"reflect"
 	"sort"
@@ -55,7 +56,7 @@ func (svc *LightsparkService) GetBalance(ctx context.Context, senderPubkey strin
 	return msats / 1000, nil
 }
 
-func (svc *LightsparkService) ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []Nip47Transaction, err error) {
+func (svc *LightsparkService) ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []nip47.Nip47Transaction, err error) {
 	account, err := svc.client.GetCurrentAccount()
 	if err != nil {
 		return nil, err
@@ -124,7 +125,7 @@ func (svc *LightsparkService) GetInfo(ctx context.Context, senderPubkey string) 
 	}, nil
 }
 
-func (svc *LightsparkService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *Nip47Transaction, err error) {
+func (svc *LightsparkService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error) {
 	var descriptionHashBytes []byte
 
 	if descriptionHash != "" {
@@ -156,7 +157,7 @@ func (svc *LightsparkService) MakeInvoice(ctx context.Context, senderPubkey stri
 	return transaction, nil
 }
 
-func (svc *LightsparkService) LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *Nip47Transaction, err error) {
+func (svc *LightsparkService) LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *nip47.Nip47Transaction, err error) {
 	paymentHashBytes, err := hex.DecodeString(paymentHash)
 
 	if err != nil || len(paymentHashBytes) != 32 {
@@ -181,7 +182,7 @@ func (svc *LightsparkService) LookupInvoice(ctx context.Context, senderPubkey st
 	return transaction, nil
 }
 
-func (svc *LightsparkService) SendPaymentSync(ctx context.Context, senderPubkey, payReq string) (preimage string, err error) {
+func (svc *LightsparkService) SendPaymentSync(ctx context.Context, senderPubkey, payReq string, amount int64) (preimage string, err error) {
 	bolt11, err := decodepay.Decodepay(payReq)
 	if err != nil {
 		return "", err
@@ -205,7 +206,7 @@ func (svc *LightsparkService) SendPaymentSync(ctx context.Context, senderPubkey,
 	return *outgoingPayment.PaymentPreimage, nil
 }
 
-func (svc *LightsparkService) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []TLVRecord) (respPreimage string, err error) {
+func (svc *LightsparkService) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []nip47.TLVRecord) (respPreimage string, err error) {
 	// NOTE: We don't use the preimage or custom records for keysend in Lightspark.
 	maxFees := math.Round(float64(amount) * .0016)
 	resp, err := svc.client.SendPayment(svc.nodeId, destination, amount, 60, int64(maxFees))
@@ -281,7 +282,7 @@ func NewLightsparkService(ctx context.Context, svc *Service, e *echo.Echo) (resu
 	return lightsparkService, nil
 }
 
-func (svc *LightsparkService) lightsparkTransactionToNip47(transaction objects.LightningTransaction) (*Nip47Transaction, error) {
+func (svc *LightsparkService) lightsparkTransactionToNip47(transaction objects.LightningTransaction) (*nip47.Nip47Transaction, error) {
 	settledAt := transaction.GetResolvedAt().Unix()
 	var preimage string
 	var expiresAt *int64
@@ -327,7 +328,7 @@ func (svc *LightsparkService) lightsparkTransactionToNip47(transaction objects.L
 	if isOutgoing {
 		paymentType = "outgoing"
 	}
-	return &Nip47Transaction{
+	return &nip47.Nip47Transaction{
 		Type:            paymentType,
 		Invoice:         encodedPaymentRequest,
 		Description:     bolt11.Description,
@@ -343,14 +344,14 @@ func (svc *LightsparkService) lightsparkTransactionToNip47(transaction objects.L
 	}, nil
 }
 
-func (svc *LightsparkService) lightsparkInvoiceToNip47(invoice objects.Invoice) (*Nip47Transaction, error) {
+func (svc *LightsparkService) lightsparkInvoiceToNip47(invoice objects.Invoice) (*nip47.Nip47Transaction, error) {
 	encodedPaymentRequest := strings.ToLower(invoice.Data.EncodedPaymentRequest)
 	bolt11, err := decodepay.Decodepay(encodedPaymentRequest)
 	if err != nil {
 		return nil, err
 	}
 	expiresAt := invoice.Data.ExpiresAt.Unix()
-	return &Nip47Transaction{
+	return &nip47.Nip47Transaction{
 		Type:            "incoming",
 		Invoice:         invoice.Data.EncodedPaymentRequest,
 		Description:     bolt11.Description,

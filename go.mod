@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/labstack/echo-contrib v0.14.1
 	github.com/labstack/echo/v4 v4.10.2
-	github.com/lightsparkdev/go-sdk v0.12.1-0.20240517070615-781c4c5a59a0
+	github.com/lightsparkdev/go-sdk v0.13.0
 	github.com/nbd-wtf/go-nostr v0.25.5
 	github.com/nbd-wtf/ln-decodepay v1.11.1
 	github.com/stretchr/testify v1.8.4
@@ -29,6 +29,7 @@ require (
 	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
 	github.com/DataDog/go-tuf v0.3.0--fix-localmeta-fork // indirect
 	github.com/DataDog/sketches-go v1.2.1 // indirect
+	github.com/DataDog/zstd v1.5.5 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/aead/siphash v1.0.1 // indirect

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/getAlby/nostr-wallet-connect/nip47"
 	"strings"
 	"time"
 
@@ -174,8 +175,8 @@ func (svc *Service) HandleEvent(ctx context.Context, event *nostr.Event) (result
 		if err != nil {
 			return nil, err
 		}
-		resp, _ := svc.createResponse(event, Nip47Response{
-			Error: &Nip47Error{
+		resp, _ := svc.createResponse(event, nip47.Nip47Response{
+			Error: &nip47.Nip47Error{
 				Code:    NIP_47_ERROR_UNAUTHORIZED,
 				Message: "The public key does not have a wallet connected.",
 			},
@@ -203,7 +204,7 @@ func (svc *Service) HandleEvent(ctx context.Context, event *nostr.Event) (result
 		}).Errorf("Failed to decrypt content: %v", err)
 		return nil, err
 	}
-	nip47Request := &Nip47Request{}
+	nip47Request := &nip47.Nip47Request{}
 	err = json.Unmarshal([]byte(payload), nip47Request)
 	if err != nil {
 		return nil, err
@@ -224,9 +225,9 @@ func (svc *Service) HandleEvent(ctx context.Context, event *nostr.Event) (result
 	case NIP_47_GET_INFO_METHOD:
 		return svc.HandleGetInfoEvent(ctx, nip47Request, event, app, ss)
 	default:
-		return svc.createResponse(event, Nip47Response{
+		return svc.createResponse(event, nip47.Nip47Response{
 			ResultType: nip47Request.Method,
-			Error: &Nip47Error{
+			Error: &nip47.Nip47Error{
 				Code:    NIP_47_ERROR_NOT_IMPLEMENTED,
 				Message: fmt.Sprintf("Unknown method: %s", nip47Request.Method),
 			}}, ss)

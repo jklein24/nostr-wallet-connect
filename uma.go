@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/getAlby/nostr-wallet-connect/nip47"
+	"github.com/getAlby/nostr-wallet-connect/uma"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -18,74 +19,60 @@ import (
 	"gorm.io/gorm"
 )
 
-type AlbyOAuthService struct {
+type UmaNwcAdapterService struct {
 	cfg       *Config
 	oauthConf *oauth2.Config
 	db        *gorm.DB
 	Logger    *logrus.Logger
 }
 
-func NewAlbyOauthService(svc *Service, e *echo.Echo) (result *AlbyOAuthService, err error) {
+func NewUmaNwcAdapterService(svc *Service, e *echo.Echo) (result *UmaNwcAdapterService, err error) {
 	conf := &oauth2.Config{
-		ClientID:     svc.cfg.AlbyClientId,
-		ClientSecret: svc.cfg.AlbyClientSecret,
+		ClientID:     "", // not used
+		ClientSecret: "", // not used
 		//Todo: do we really need all these permissions?
 		Scopes: []string{"account:read", "payments:send", "invoices:read", "transactions:read", "invoices:create", "balance:read"},
 		Endpoint: oauth2.Endpoint{
-			TokenURL:  svc.cfg.OAuthTokenUrl,
-			AuthURL:   svc.cfg.OAuthAuthUrl,
+			TokenURL:  "", // Not used right now
+			AuthURL:   svc.cfg.UmaLoginUrl,
 			AuthStyle: 2, // use HTTP Basic Authorization https://pkg.go.dev/golang.org/x/oauth2#AuthStyle
 		},
 		RedirectURL: svc.cfg.OAuthRedirectUrl,
 	}
 
-	albySvc := &AlbyOAuthService{
+	umaSvc := &UmaNwcAdapterService{
 		cfg:       svc.cfg,
 		oauthConf: conf,
 		db:        svc.db,
 		Logger:    svc.Logger,
 	}
 
-	e.GET("/alby/auth", albySvc.AuthHandler)
-	e.GET("/alby/callback", albySvc.CallbackHandler)
+	e.GET("/uma/auth", umaSvc.AuthHandler)
+	e.GET("/uma/callback", umaSvc.CallbackHandler)
 
-	return albySvc, err
+	return umaSvc, err
 }
 
-func (svc *AlbyOAuthService) FetchUserToken(ctx context.Context, app App) (token *oauth2.Token, err error) {
+func (svc *UmaNwcAdapterService) FetchUserToken(ctx context.Context, app App) (token *oauth2.Token, err error) {
 	user := app.User
-	tok, err := svc.oauthConf.TokenSource(ctx, &oauth2.Token{
-		AccessToken:  user.AccessToken,
-		RefreshToken: user.RefreshToken,
-		Expiry:       user.Expiry,
-	}).Token()
-	if err != nil {
+	if user.AccessToken == "" {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": app.NostrPubkey,
 			"appId":        app.ID,
 			"userId":       app.User.ID,
-		}).Errorf("Token error: %v", err)
-		return nil, err
+		}).Error("User does not have access token")
+		return nil, errors.New("user does not have access token")
 	}
-	// we always update the user's token for future use
-	// the oauth library handles the token refreshing
-	user.AccessToken = tok.AccessToken
-	user.RefreshToken = tok.RefreshToken
-	user.Expiry = tok.Expiry // TODO; probably needs some calculation
-	err = svc.db.Save(&user).Error
-	if err != nil {
-		svc.Logger.WithError(err).Error("Error saving user")
-		return nil, err
+	// TODO: Use real oauth and refresh if needed here.
+	tok := &oauth2.Token{
+		AccessToken: user.AccessToken,
+		TokenType:   "Basic", // Use bearer or omit when it's a real token
 	}
 	return tok, nil
 }
 
-func (svc *AlbyOAuthService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error) {
-	// TODO: move to a shared function
-	app := App{}
-	err = svc.db.Preload("User").First(&app, &App{
-		NostrPubkey: senderPubkey,
-	}).Error
+func (svc *UmaNwcAdapterService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey":    senderPubkey,
@@ -97,20 +84,6 @@ func (svc *AlbyOAuthService) MakeInvoice(ctx context.Context, senderPubkey strin
 		return nil, err
 	}
 
-	// amount provided in msat, but Alby API currently only supports sats. Will get truncated to a whole sat value
-	var amountSat int64 = amount / 1000
-	// make sure amount is not converted to 0
-	if amount > 0 && amountSat == 0 {
-		svc.Logger.WithFields(logrus.Fields{
-			"senderPubkey":    senderPubkey,
-			"amount":          amount,
-			"description":     description,
-			"descriptionHash": descriptionHash,
-			"expiry":          expiry,
-		}).Errorf("amount must be 1000 msat or greater")
-		return nil, errors.New("amount must be 1000 msat or greater")
-	}
-
 	svc.Logger.WithFields(logrus.Fields{
 		"senderPubkey":    senderPubkey,
 		"amount":          amount,
@@ -120,23 +93,23 @@ func (svc *AlbyOAuthService) MakeInvoice(ctx context.Context, senderPubkey strin
 		"appId":           app.ID,
 		"userId":          app.User.ID,
 	}).Info("Processing make invoice request")
-	tok, err := svc.FetchUserToken(ctx, app)
+	tok, err := svc.FetchUserToken(ctx, *app)
 	if err != nil {
 		return nil, err
 	}
 	client := svc.oauthConf.Client(ctx, tok)
 
 	body := bytes.NewBuffer([]byte{})
-	payload := &MakeInvoiceRequest{
-		Amount:          amountSat,
+	payload := &uma.MakeInvoiceRequest{
+		Amount:          amount,
 		Description:     description,
 		DescriptionHash: descriptionHash,
-		// TODO: support expiry
+		Expiry:          expiry,
 	}
 	err = json.NewEncoder(body).Encode(payload)
 
 	// TODO: move to a shared function
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/invoices", svc.cfg.AlbyAPIURL), body)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/invoice", svc.cfg.UmaAPIURL), body)
 	if err != nil {
 		svc.Logger.WithError(err).Error("Error creating request /invoices")
 		return nil, err
@@ -161,7 +134,7 @@ func (svc *AlbyOAuthService) MakeInvoice(ctx context.Context, senderPubkey strin
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &AlbyInvoice{}
+		responsePayload := &uma.UmaBolt11Invoice{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return nil, err
@@ -178,7 +151,7 @@ func (svc *AlbyOAuthService) MakeInvoice(ctx context.Context, senderPubkey strin
 			"paymentHash":     responsePayload.PaymentHash,
 		}).Info("Make invoice successful")
 
-		transaction := albyInvoiceToTransaction(responsePayload)
+		transaction := responsePayload.ToNip47Transaction()
 		return transaction, nil
 	}
 
@@ -197,12 +170,8 @@ func (svc *AlbyOAuthService) MakeInvoice(ctx context.Context, senderPubkey strin
 	return nil, errors.New(errorPayload.Message)
 }
 
-func (svc *AlbyOAuthService) LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *nip47.Nip47Transaction, err error) {
-	// TODO: move to a shared function
-	app := App{}
-	err = svc.db.Preload("User").First(&app, &App{
-		NostrPubkey: senderPubkey,
-	}).Error
+func (svc *UmaNwcAdapterService) LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *nip47.Nip47Transaction, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
@@ -217,7 +186,7 @@ func (svc *AlbyOAuthService) LookupInvoice(ctx context.Context, senderPubkey str
 		"appId":        app.ID,
 		"userId":       app.User.ID,
 	}).Info("Processing lookup invoice request")
-	tok, err := svc.FetchUserToken(ctx, app)
+	tok, err := svc.FetchUserToken(ctx, *app)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +195,7 @@ func (svc *AlbyOAuthService) LookupInvoice(ctx context.Context, senderPubkey str
 	body := bytes.NewBuffer([]byte{})
 
 	// TODO: move to a shared function
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/invoices/%s", svc.cfg.AlbyAPIURL, paymentHash), body)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/invoices/%s", svc.cfg.UmaAPIURL, paymentHash), body)
 	if err != nil {
 		svc.Logger.WithError(err).Errorf("Error creating request /invoices/%s", paymentHash)
 		return nil, err
@@ -247,7 +216,7 @@ func (svc *AlbyOAuthService) LookupInvoice(ctx context.Context, senderPubkey str
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &AlbyInvoice{}
+		responsePayload := &uma.UmaBolt11Invoice{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return nil, err
@@ -258,10 +227,10 @@ func (svc *AlbyOAuthService) LookupInvoice(ctx context.Context, senderPubkey str
 			"appId":          app.ID,
 			"userId":         app.User.ID,
 			"paymentRequest": responsePayload.PaymentRequest,
-			"settled":        responsePayload.Settled,
+			"settled":        responsePayload.SettledAt != nil,
 		}).Info("Lookup invoice successful")
 
-		transaction = albyInvoiceToTransaction(responsePayload)
+		transaction = responsePayload.ToNip47Transaction()
 		return transaction, nil
 	}
 
@@ -277,11 +246,8 @@ func (svc *AlbyOAuthService) LookupInvoice(ctx context.Context, senderPubkey str
 	return nil, errors.New(errorPayload.Message)
 }
 
-func (svc *AlbyOAuthService) GetInfo(ctx context.Context, senderPubkey string) (info *NodeInfo, err error) {
-	app := App{}
-	err = svc.db.Preload("User").First(&app, &App{
-		NostrPubkey: senderPubkey,
-	}).Error
+func (svc *UmaNwcAdapterService) GetInfo(ctx context.Context, senderPubkey string) (info *NodeInfo, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
@@ -294,8 +260,9 @@ func (svc *AlbyOAuthService) GetInfo(ctx context.Context, senderPubkey string) (
 		"appId":        app.ID,
 		"userId":       app.User.ID,
 	}).Info("Info fetch successful")
+	// TODO: Implement real node info
 	return &NodeInfo{
-		Alias:       "getalby.com",
+		Alias:       "UMA",
 		Color:       "",
 		Pubkey:      "",
 		Network:     "mainnet",
@@ -304,24 +271,21 @@ func (svc *AlbyOAuthService) GetInfo(ctx context.Context, senderPubkey string) (
 	}, err
 }
 
-func (svc *AlbyOAuthService) GetBalance(ctx context.Context, senderPubkey string) (balance int64, err error) {
-	app := App{}
-	err = svc.db.Preload("User").First(&app, &App{
-		NostrPubkey: senderPubkey,
-	}).Error
+func (svc *UmaNwcAdapterService) GetBalance(ctx context.Context, senderPubkey string) (balance int64, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
 		}).Errorf("App not found: %v", err)
 		return 0, err
 	}
-	tok, err := svc.FetchUserToken(ctx, app)
+	tok, err := svc.FetchUserToken(ctx, *app)
 	if err != nil {
 		return 0, err
 	}
 	client := svc.oauthConf.Client(ctx, tok)
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/balance", svc.cfg.AlbyAPIURL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/balance", svc.cfg.UmaAPIURL), nil)
 	if err != nil {
 		svc.Logger.WithError(err).Error("Error creating request /balance")
 		return 0, err
@@ -340,7 +304,7 @@ func (svc *AlbyOAuthService) GetBalance(ctx context.Context, senderPubkey string
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &BalanceResponse{}
+		responsePayload := &uma.BalanceResponse{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return 0, err
@@ -350,7 +314,14 @@ func (svc *AlbyOAuthService) GetBalance(ctx context.Context, senderPubkey string
 			"appId":        app.ID,
 			"userId":       app.User.ID,
 		}).Info("Balance fetch successful")
-		return int64(responsePayload.Balance), nil
+		// find a balance for btc:
+		for _, asset := range responsePayload.Balances {
+			if asset.Currency == "BTC" {
+				return asset.Balance, nil
+			}
+		}
+
+		return 0, errors.New("no BTC balance found")
 	}
 
 	errorPayload := &ErrorResponse{}
@@ -360,22 +331,19 @@ func (svc *AlbyOAuthService) GetBalance(ctx context.Context, senderPubkey string
 		"appId":         app.ID,
 		"userId":        app.User.ID,
 		"APIHttpStatus": resp.StatusCode,
-	}).Errorf("Balance fetch failed %s", string(errorPayload.Message))
+	}).Errorf("Balance fetch failed %s", errorPayload.Message)
 	return 0, errors.New(errorPayload.Message)
 }
 
-func (svc *AlbyOAuthService) ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []nip47.Nip47Transaction, err error) {
-	app := App{}
-	err = svc.db.Preload("User").First(&app, &App{
-		NostrPubkey: senderPubkey,
-	}).Error
+func (svc *UmaNwcAdapterService) ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []nip47.Nip47Transaction, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
 		}).Errorf("App not found: %v", err)
 		return nil, err
 	}
-	tok, err := svc.FetchUserToken(ctx, app)
+	tok, err := svc.FetchUserToken(ctx, *app)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +373,7 @@ func (svc *AlbyOAuthService) ListTransactions(ctx context.Context, senderPubkey 
 		endpoint += "/outgoing"
 	}
 
-	requestUrl := fmt.Sprintf("%s%s?%s", svc.cfg.AlbyAPIURL, endpoint, urlParams.Encode())
+	requestUrl := fmt.Sprintf("%s%s?%s", svc.cfg.UmaAPIURL, endpoint, urlParams.Encode())
 
 	req, err := http.NewRequest("GET", requestUrl, nil)
 	if err != nil {
@@ -426,7 +394,7 @@ func (svc *AlbyOAuthService) ListTransactions(ctx context.Context, senderPubkey 
 		return nil, err
 	}
 
-	var invoices []AlbyInvoice
+	var invoices []uma.UmaBolt11Invoice
 
 	if resp.StatusCode < 300 {
 		err = json.NewDecoder(resp.Body).Decode(&invoices)
@@ -442,7 +410,7 @@ func (svc *AlbyOAuthService) ListTransactions(ctx context.Context, senderPubkey 
 
 		transactions = []nip47.Nip47Transaction{}
 		for _, invoice := range invoices {
-			transaction := albyInvoiceToTransaction(&invoice)
+			transaction := invoice.ToNip47Transaction()
 
 			transactions = append(transactions, *transaction)
 		}
@@ -468,11 +436,8 @@ func (svc *AlbyOAuthService) ListTransactions(ctx context.Context, senderPubkey 
 	return nil, errors.New(errorPayload.Message)
 }
 
-func (svc *AlbyOAuthService) SendPaymentSync(ctx context.Context, senderPubkey, payReq string, amount int64) (preimage string, err error) {
-	app := App{}
-	err = svc.db.Preload("User").First(&app, &App{
-		NostrPubkey: senderPubkey,
-	}).Error
+func (svc *UmaNwcAdapterService) SendPaymentSync(ctx context.Context, senderPubkey, payReq string, amount int64) (preimage string, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
@@ -486,19 +451,20 @@ func (svc *AlbyOAuthService) SendPaymentSync(ctx context.Context, senderPubkey, 
 		"appId":        app.ID,
 		"userId":       app.User.ID,
 	}).Info("Processing payment request")
-	tok, err := svc.FetchUserToken(ctx, app)
+	tok, err := svc.FetchUserToken(ctx, *app)
 	if err != nil {
 		return "", err
 	}
 	client := svc.oauthConf.Client(ctx, tok)
 
 	body := bytes.NewBuffer([]byte{})
-	payload := &PayRequest{
+	payload := &uma.PayRequest{
 		Invoice: payReq,
+		Amount:  &amount,
 	}
 	err = json.NewEncoder(body).Encode(payload)
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/payments/bolt11", svc.cfg.AlbyAPIURL), body)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/payments/bolt11", svc.cfg.UmaAPIURL), body)
 	if err != nil {
 		svc.Logger.WithError(err).Error("Error creating request /payments/bolt11")
 		return "", err
@@ -519,7 +485,7 @@ func (svc *AlbyOAuthService) SendPaymentSync(ctx context.Context, senderPubkey, 
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &PayResponse{}
+		responsePayload := &uma.PayResponse{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return "", err
@@ -546,11 +512,8 @@ func (svc *AlbyOAuthService) SendPaymentSync(ctx context.Context, senderPubkey, 
 	return "", errors.New(errorPayload.Message)
 }
 
-func (svc *AlbyOAuthService) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []nip47.TLVRecord) (preImage string, err error) {
-	app := App{}
-	err = svc.db.Preload("User").First(&app, &App{
-		NostrPubkey: senderPubkey,
-	}).Error
+func (svc *UmaNwcAdapterService) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []nip47.TLVRecord) (preImage string, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
@@ -564,7 +527,7 @@ func (svc *AlbyOAuthService) SendKeysend(ctx context.Context, senderPubkey strin
 		"appId":        app.ID,
 		"userId":       app.User.ID,
 	}).Info("Processing keysend request")
-	tok, err := svc.FetchUserToken(ctx, app)
+	tok, err := svc.FetchUserToken(ctx, *app)
 	if err != nil {
 		return "", err
 	}
@@ -584,7 +547,7 @@ func (svc *AlbyOAuthService) SendKeysend(ctx context.Context, senderPubkey strin
 	err = json.NewEncoder(body).Encode(payload)
 
 	// here we don't use the preimage from params
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/payments/keysend", svc.cfg.AlbyAPIURL), body)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/payments/keysend", svc.cfg.UmaAPIURL), body)
 	if err != nil {
 		svc.Logger.WithError(err).Error("Error creating request /payments/keysend")
 		return "", err
@@ -633,7 +596,7 @@ func (svc *AlbyOAuthService) SendKeysend(ctx context.Context, senderPubkey strin
 	return "", errors.New(errorPayload.Message)
 }
 
-func (svc *AlbyOAuthService) AuthHandler(c echo.Context) error {
+func (svc *UmaNwcAdapterService) AuthHandler(c echo.Context) error {
 	appName := c.QueryParam("c") // c - for client
 	// clear current session
 	sess, _ := session.Get(CookieName, c)
@@ -647,46 +610,20 @@ func (svc *AlbyOAuthService) AuthHandler(c echo.Context) error {
 		sess.Save(c.Request(), c.Response())
 	}
 
-	url := svc.oauthConf.AuthCodeURL(appName) // pass on the appName as state
+	url := svc.oauthConf.AuthCodeURL(appName)
 	return c.Redirect(302, url)
 }
 
-func (svc *AlbyOAuthService) CallbackHandler(c echo.Context) error {
+func (svc *UmaNwcAdapterService) CallbackHandler(c echo.Context) error {
 	code := c.QueryParam("code")
-	tok, err := svc.oauthConf.Exchange(c.Request().Context(), code)
-	if err != nil {
-		svc.Logger.WithError(err).Error("Failed to exchange token")
-		return err
-	}
-	client := svc.oauthConf.Client(c.Request().Context(), tok)
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user/me", svc.cfg.AlbyAPIURL), nil)
-	if err != nil {
-		svc.Logger.WithError(err).Error("Error creating request /me")
-		return err
-	}
-
-	req.Header.Set("User-Agent", "NWC")
-
-	res, err := client.Do(req)
-	if err != nil {
-		svc.Logger.WithError(err).Error("Failed to fetch /me")
-		return err
-	}
-	me := AlbyMe{}
-	err = json.NewDecoder(res.Body).Decode(&me)
-	if err != nil {
-		svc.Logger.WithError(err).Error("Failed to decode API response")
-		return err
-	}
+	userUma := c.QueryParam("uma")
+	// TODO: Switch to real oauth flow here when that's done on the uma side
 
 	user := User{}
-	svc.db.FirstOrInit(&user, User{AlbyIdentifier: me.Identifier})
-	user.AccessToken = tok.AccessToken
-	user.RefreshToken = tok.RefreshToken
-	user.Expiry = tok.Expiry // TODO; probably needs some calculation
-	user.Email = me.Email
-	user.LightningAddress = me.LightningAddress
+	// TODO: Maybe use a different User ID from the UMA side?
+	svc.db.FirstOrInit(&user, User{LightningAddress: userUma})
+	user.AccessToken = code
+	user.LightningAddress = userUma
 	svc.db.Save(&user)
 
 	sess, _ := session.Get(CookieName, c)
@@ -700,40 +637,12 @@ func (svc *AlbyOAuthService) CallbackHandler(c echo.Context) error {
 	return c.Redirect(302, "/")
 }
 
-func albyInvoiceToTransaction(invoice *AlbyInvoice) *nip47.Nip47Transaction {
-	description := invoice.Comment
-	if description == "" {
-		description = invoice.Memo
+func (svc *UmaNwcAdapterService) appFromPubkey(senderPubkey string) (app *App, err error) {
+	err = svc.db.Preload("User").First(&app, &App{
+		NostrPubkey: senderPubkey,
+	}).Error
+	if err != nil {
+		return nil, err
 	}
-	var preimage string
-	if invoice.SettledAt != nil {
-		preimage = invoice.Preimage
-	}
-
-	var expiresAt *int64
-	if invoice.ExpiresAt != nil {
-		expiresAtUnix := invoice.ExpiresAt.Unix()
-		expiresAt = &expiresAtUnix
-	}
-
-	var settledAt *int64
-	if invoice.SettledAt != nil {
-		settledAtUnix := invoice.SettledAt.Unix()
-		settledAt = &settledAtUnix
-	}
-
-	return &nip47.Nip47Transaction{
-		Type:            invoice.Type,
-		Invoice:         invoice.PaymentRequest,
-		Description:     description,
-		DescriptionHash: invoice.DescriptionHash,
-		Preimage:        preimage,
-		PaymentHash:     invoice.PaymentHash,
-		Amount:          invoice.Amount * 1000,
-		FeesPaid:        0, // TODO: support fees
-		CreatedAt:       invoice.CreatedAt.Unix(),
-		ExpiresAt:       expiresAt,
-		SettledAt:       settledAt,
-		Metadata:        invoice.Metadata,
-	}
+	return app, nil
 }

@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/getAlby/nostr-wallet-connect/nip47"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/sirupsen/logrus"
 )
 
-func (svc *Service) HandleGetInfoEvent(ctx context.Context, request *Nip47Request, event *nostr.Event, app App, ss []byte) (result *nostr.Event, err error) {
+func (svc *Service) HandleGetInfoEvent(ctx context.Context, request *nip47.Nip47Request, event *nostr.Event, app App, ss []byte) (result *nostr.Event, err error) {
 
 	nostrEvent := NostrEvent{App: app, NostrId: event.ID, Content: event.Content, State: "received"}
 	err = svc.db.Create(&nostrEvent).Error
@@ -30,9 +31,9 @@ func (svc *Service) HandleGetInfoEvent(ctx context.Context, request *Nip47Reques
 			"appId":     app.ID,
 		}).Errorf("App does not have permission: %s %s", code, message)
 
-		return svc.createResponse(event, Nip47Response{
+		return svc.createResponse(event, nip47.Nip47Response{
 			ResultType: request.Method,
-			Error: &Nip47Error{
+			Error: &nip47.Nip47Error{
 				Code:    code,
 				Message: message,
 			}}, ss)
@@ -53,16 +54,16 @@ func (svc *Service) HandleGetInfoEvent(ctx context.Context, request *Nip47Reques
 		}).Infof("Failed to fetch node info: %v", err)
 		nostrEvent.State = NOSTR_EVENT_STATE_HANDLER_ERROR
 		svc.db.Save(&nostrEvent)
-		return svc.createResponse(event, Nip47Response{
+		return svc.createResponse(event, nip47.Nip47Response{
 			ResultType: request.Method,
-			Error: &Nip47Error{
+			Error: &nip47.Nip47Error{
 				Code:    NIP_47_ERROR_INTERNAL,
 				Message: fmt.Sprintf("Something went wrong while fetching node info: %s", err.Error()),
 			},
 		}, ss)
 	}
 
-	responsePayload := &Nip47GetInfoResponse{
+	responsePayload := &nip47.Nip47GetInfoResponse{
 		Alias:       info.Alias,
 		Color:       info.Color,
 		Pubkey:      info.Pubkey,
@@ -74,7 +75,7 @@ func (svc *Service) HandleGetInfoEvent(ctx context.Context, request *Nip47Reques
 
 	nostrEvent.State = NOSTR_EVENT_STATE_HANDLER_EXECUTED
 	svc.db.Save(&nostrEvent)
-	return svc.createResponse(event, Nip47Response{
+	return svc.createResponse(event, nip47.Nip47Response{
 		ResultType: request.Method,
 		Result:     responsePayload,
 	}, ss)
