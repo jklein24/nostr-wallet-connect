@@ -125,6 +125,10 @@ func (svc *LightsparkService) GetInfo(ctx context.Context, senderPubkey string) 
 	}, nil
 }
 
+func (svc *LightsparkService) LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error) {
+	return nil, errors.New("Not implemented")
+}
+
 func (svc *LightsparkService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error) {
 	var descriptionHashBytes []byte
 

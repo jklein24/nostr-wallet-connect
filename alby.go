@@ -304,6 +304,10 @@ func (svc *AlbyOAuthService) GetInfo(ctx context.Context, senderPubkey string) (
 	}, err
 }
 
+func (svc *AlbyOAuthService) LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error) {
+	return nil, errors.New("Not implemented")
+}
+
 func (svc *AlbyOAuthService) GetBalance(ctx context.Context, senderPubkey string) (balance int64, err error) {
 	app := App{}
 	err = svc.db.Preload("User").First(&app, &App{

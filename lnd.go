@@ -30,6 +30,7 @@ type LNClient interface {
 	MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error)
 	LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *nip47.Nip47Transaction, err error)
 	ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []nip47.Nip47Transaction, err error)
+	LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error)
 }
 
 // wrap it again :sweat_smile:
@@ -160,6 +161,10 @@ func (svc *LNDService) GetInfo(ctx context.Context, senderPubkey string) (info *
 		BlockHeight: resp.BlockHeight,
 		BlockHash:   resp.BlockHash,
 	}, nil
+}
+
+func (svc *LNDService) LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error) {
+	return nil, errors.New("Not implemented")
 }
 
 func (svc *LNDService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error) {

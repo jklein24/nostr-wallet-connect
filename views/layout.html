@@ -45,7 +45,7 @@
           {{if .User}}
           <div class="flex items-center relative">
             <p class="text-gray-400 dark:text-gray-400 text-xs font-medium sm:text-base cursor-pointer select-none " id="dropdown-menu">
-              {{.User.Email}}
+              {{if .User.Email}}{{.User.Email}}{{else}}{{.User.LightningAddress}}{{end}}
               <img
                 id="caret"
                 class="inline cursor-pointer w-4 ml-2"

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/getAlby/nostr-wallet-connect/nip47"
 	"github.com/getAlby/nostr-wallet-connect/uma"
+	"github.com/golang-jwt/jwt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -66,7 +67,7 @@ func (svc *UmaNwcAdapterService) FetchUserToken(ctx context.Context, app App) (t
 	// TODO: Use real oauth and refresh if needed here.
 	tok := &oauth2.Token{
 		AccessToken: user.AccessToken,
-		TokenType:   "Basic", // Use bearer or omit when it's a real token
+		TokenType:   "Bearer", // Use bearer or omit when it's a real token
 	}
 	return tok, nil
 }
@@ -269,6 +270,78 @@ func (svc *UmaNwcAdapterService) GetInfo(ctx context.Context, senderPubkey strin
 		BlockHeight: 0,
 		BlockHash:   "",
 	}, err
+}
+
+func (svc *UmaNwcAdapterService) LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"address":      address,
+		}).Errorf("App not found: %v", err)
+		return nil, err
+	}
+
+	svc.Logger.WithFields(logrus.Fields{
+		"senderPubkey": senderPubkey,
+		"address":      address,
+		"appId":        app.ID,
+		"userId":       app.User.ID,
+	}).Info("Processing lookup user request")
+	tok, err := svc.FetchUserToken(ctx, *app)
+	if err != nil {
+		return nil, err
+	}
+	client := svc.oauthConf.Client(ctx, tok)
+
+	body := bytes.NewBuffer([]byte{})
+
+	// TODO: move to a shared function
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/receiver_info/%s", svc.cfg.UmaAPIURL, address), body)
+	if err != nil {
+		svc.Logger.WithError(err).Errorf("Error creating request /receiver_info/%s", address)
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "NWC")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"address":      address,
+			"appId":        app.ID,
+			"userId":       app.User.ID,
+		}).Errorf("Failed to lookup user: %v", err)
+		return nil, err
+	}
+
+	if resp.StatusCode < 300 {
+		responsePayload := &uma.LookupUserResponse{}
+		err = json.NewDecoder(resp.Body).Decode(responsePayload)
+		if err != nil {
+			return nil, err
+		}
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"address":      address,
+			"appId":        app.ID,
+			"userId":       app.User.ID,
+		}).Info("Lookup user successful")
+
+		return responsePayload.ToNip47LookupUserResponse(), nil
+	}
+
+	errorPayload := &ErrorResponse{}
+	err = json.NewDecoder(resp.Body).Decode(errorPayload)
+	svc.Logger.WithFields(logrus.Fields{
+		"senderPubkey": senderPubkey,
+		"address":      address,
+		"appId":        app.ID,
+		"userId":       app.User.ID,
+	}).Errorf("Lookup user failed %s", string(errorPayload.Message))
+	return nil, errors.New(errorPayload.Message)
 }
 
 func (svc *UmaNwcAdapterService) GetBalance(ctx context.Context, senderPubkey string) (balance int64, err error) {
@@ -615,15 +688,31 @@ func (svc *UmaNwcAdapterService) AuthHandler(c echo.Context) error {
 }
 
 func (svc *UmaNwcAdapterService) CallbackHandler(c echo.Context) error {
-	code := c.QueryParam("code")
-	userUma := c.QueryParam("uma")
+	userJwt := c.QueryParam("token")
+	token, err := jwt.ParseWithClaims(userJwt, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(svc.cfg.CookieSecret), nil
+	})
+	if err != nil {
+		return err
+	}
+	claims := token.Claims.(jwt.MapClaims)
 	// TODO: Switch to real oauth flow here when that's done on the uma side
 
 	user := User{}
+	umaAddress := claims["address"].(string)
 	// TODO: Maybe use a different User ID from the UMA side?
-	svc.db.FirstOrInit(&user, User{LightningAddress: userUma})
-	user.AccessToken = code
-	user.LightningAddress = userUma
+	svc.db.FirstOrInit(&user, User{AlbyIdentifier: claims["sub"].(string)})
+
+	// TODO: Should update the expiry of the claims when we create the secret
+	delete(claims, "exp")
+	newJwt := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	newTokenStr, err := newJwt.SignedString([]byte(svc.cfg.CookieSecret))
+	if err != nil {
+		return err
+	}
+
+	user.AccessToken = newTokenStr
+	user.LightningAddress = umaAddress
 	svc.db.Save(&user)
 
 	sess, _ := session.Get(CookieName, c)

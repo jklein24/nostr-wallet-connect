@@ -18,6 +18,10 @@ const (
 	NIP_47_LOOKUP_INVOICE_METHOD      = "lookup_invoice"
 	NIP_47_LIST_TRANSACTIONS_METHOD   = "list_transactions"
 	NIP_47_PAY_KEYSEND_METHOD         = "pay_keysend"
+	NIP_47_LOOKUP_USER_METHOD         = "lookup_user"
+	NIP_47_GET_QUOTE_METHOD           = "get_quote"
+	NIP_47_EXECUTE_QUOTE_METHOD       = "execute_quote"
+	NIP_47_PAY_ADDRESS_METHOD         = "pay_address"
 	NIP_47_ERROR_INTERNAL             = "INTERNAL"
 	NIP_47_ERROR_NOT_IMPLEMENTED      = "NOT_IMPLEMENTED"
 	NIP_47_ERROR_QUOTA_EXCEEDED       = "QUOTA_EXCEEDED"
@@ -26,7 +30,7 @@ const (
 	NIP_47_ERROR_EXPIRED              = "EXPIRED"
 	NIP_47_ERROR_RESTRICTED           = "RESTRICTED"
 	NIP_47_OTHER                      = "OTHER"
-	NIP_47_CAPABILITIES               = "pay_invoice pay_keysend get_balance get_info make_invoice lookup_invoice list_transactions"
+	NIP_47_CAPABILITIES               = "pay_invoice pay_keysend get_balance get_info make_invoice lookup_invoice list_transactions lookup_user get_quote execute_quote pay_address"
 )
 
 const (
