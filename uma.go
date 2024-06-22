@@ -29,12 +29,11 @@ type UmaNwcAdapterService struct {
 
 func NewUmaNwcAdapterService(svc *Service, e *echo.Echo) (result *UmaNwcAdapterService, err error) {
 	conf := &oauth2.Config{
-		ClientID:     "", // not used
-		ClientSecret: "", // not used
-		//Todo: do we really need all these permissions?
-		Scopes: []string{"account:read", "payments:send", "invoices:read", "transactions:read", "invoices:create", "balance:read"},
+		ClientID:     "nwc",
+		ClientSecret: "beef0fdeadbe4d",
+		Scopes:       []string{"all"},
 		Endpoint: oauth2.Endpoint{
-			TokenURL:  "", // Not used right now
+			TokenURL:  svc.cfg.UmaTokenUrl,
 			AuthURL:   svc.cfg.UmaLoginUrl,
 			AuthStyle: 2, // use HTTP Basic Authorization https://pkg.go.dev/golang.org/x/oauth2#AuthStyle
 		},
@@ -56,18 +55,28 @@ func NewUmaNwcAdapterService(svc *Service, e *echo.Echo) (result *UmaNwcAdapterS
 
 func (svc *UmaNwcAdapterService) FetchUserToken(ctx context.Context, app App) (token *oauth2.Token, err error) {
 	user := app.User
-	if user.AccessToken == "" {
+	tok, err := svc.oauthConf.TokenSource(ctx, &oauth2.Token{
+		AccessToken:  user.AccessToken,
+		RefreshToken: user.RefreshToken,
+		Expiry:       user.Expiry,
+	}).Token()
+	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": app.NostrPubkey,
 			"appId":        app.ID,
 			"userId":       app.User.ID,
-		}).Error("User does not have access token")
-		return nil, errors.New("user does not have access token")
+		}).Errorf("Token error: %v", err)
+		return nil, err
 	}
-	// TODO: Use real oauth and refresh if needed here.
-	tok := &oauth2.Token{
-		AccessToken: user.AccessToken,
-		TokenType:   "Bearer", // Use bearer or omit when it's a real token
+	// we always update the user's token for future use
+	// the oauth library handles the token refreshing
+	user.AccessToken = tok.AccessToken
+	user.RefreshToken = tok.RefreshToken
+	user.Expiry = tok.Expiry // TODO; probably needs some calculation
+	err = svc.db.Save(&user).Error
+	if err != nil {
+		svc.Logger.WithError(err).Error("Error saving user")
+		return nil, err
 	}
 	return tok, nil
 }
@@ -665,7 +674,7 @@ func (svc *UmaNwcAdapterService) SendKeysend(ctx context.Context, senderPubkey s
 		"appId":         app.ID,
 		"userId":        app.User.ID,
 		"APIHttpStatus": resp.StatusCode,
-	}).Errorf("Payment failed %s", string(errorPayload.Message))
+	}).Errorf("Payment failed %s", errorPayload.Message)
 	return "", errors.New(errorPayload.Message)
 }
 
@@ -688,30 +697,24 @@ func (svc *UmaNwcAdapterService) AuthHandler(c echo.Context) error {
 }
 
 func (svc *UmaNwcAdapterService) CallbackHandler(c echo.Context) error {
-	userJwt := c.QueryParam("token")
-	token, err := jwt.ParseWithClaims(userJwt, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(svc.cfg.CookieSecret), nil
-	})
+	code := c.QueryParam("code")
+	tok, err := svc.oauthConf.Exchange(c.Request().Context(), code)
+	if err != nil {
+		svc.Logger.WithError(err).Error("Failed to exchange token")
+		return err
+	}
+	parsedJwt, _, err := new(jwt.Parser).ParseUnverified(tok.AccessToken, jwt.MapClaims{})
 	if err != nil {
 		return err
 	}
-	claims := token.Claims.(jwt.MapClaims)
-	// TODO: Switch to real oauth flow here when that's done on the uma side
+	claims := parsedJwt.Claims.(jwt.MapClaims)
 
 	user := User{}
 	umaAddress := claims["address"].(string)
 	// TODO: Maybe use a different User ID from the UMA side?
 	svc.db.FirstOrInit(&user, User{AlbyIdentifier: claims["sub"].(string)})
 
-	// TODO: Should update the expiry of the claims when we create the secret
-	delete(claims, "exp")
-	newJwt := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	newTokenStr, err := newJwt.SignedString([]byte(svc.cfg.CookieSecret))
-	if err != nil {
-		return err
-	}
-
-	user.AccessToken = newTokenStr
+	user.AccessToken = tok.AccessToken
 	user.LightningAddress = umaAddress
 	svc.db.Save(&user)
 
