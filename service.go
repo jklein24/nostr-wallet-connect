@@ -226,11 +226,11 @@ func (svc *Service) HandleEvent(ctx context.Context, event *nostr.Event) (result
 		return svc.HandleGetInfoEvent(ctx, nip47Request, event, app, ss)
 	case NIP_47_LOOKUP_USER_METHOD:
 		return svc.HandleLookupUserEvent(ctx, nip47Request, event, app, ss)
-	case NIP_47_GET_QUOTE_METHOD:
+	case NIP_47_FETCH_QUOTE_METHOD:
 		return svc.HandleGetQuoteEvent(ctx, nip47Request, event, app, ss)
 	case NIP_47_EXECUTE_QUOTE_METHOD:
 		return svc.HandleExecuteQuoteEvent(ctx, nip47Request, event, app, ss)
-	case NIP_47_PAY_ADDRESS_METHOD:
+	case NIP_47_PAY_TO_ADDRESS_METHOD:
 		return svc.HandlePayAddressEvent(ctx, nip47Request, event, app, ss)
 	default:
 		return svc.createResponse(event, nip47.Nip47Response{

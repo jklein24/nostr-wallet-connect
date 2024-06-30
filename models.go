@@ -19,9 +19,9 @@ const (
 	NIP_47_LIST_TRANSACTIONS_METHOD   = "list_transactions"
 	NIP_47_PAY_KEYSEND_METHOD         = "pay_keysend"
 	NIP_47_LOOKUP_USER_METHOD         = "lookup_user"
-	NIP_47_GET_QUOTE_METHOD           = "get_quote"
+	NIP_47_FETCH_QUOTE_METHOD         = "fetch_quote"
 	NIP_47_EXECUTE_QUOTE_METHOD       = "execute_quote"
-	NIP_47_PAY_ADDRESS_METHOD         = "pay_address"
+	NIP_47_PAY_TO_ADDRESS_METHOD      = "pay_to_address"
 	NIP_47_ERROR_INTERNAL             = "INTERNAL"
 	NIP_47_ERROR_NOT_IMPLEMENTED      = "NOT_IMPLEMENTED"
 	NIP_47_ERROR_QUOTA_EXCEEDED       = "QUOTA_EXCEEDED"
@@ -48,6 +48,10 @@ var nip47MethodDescriptions = map[string]string{
 	NIP_47_MAKE_INVOICE_METHOD:      "Create invoices",
 	NIP_47_LOOKUP_INVOICE_METHOD:    "Lookup status of invoices",
 	NIP_47_LIST_TRANSACTIONS_METHOD: "Read incoming transaction history",
+	NIP_47_LOOKUP_USER_METHOD:       "Lookup user info and currency preferences",
+	NIP_47_FETCH_QUOTE_METHOD:       "Get a quote for a cross-currency payment",
+	NIP_47_EXECUTE_QUOTE_METHOD:     "Execute a cross-currency payment",
+	NIP_47_PAY_TO_ADDRESS_METHOD:    "Send payments to a specific receiver address",
 }
 
 var nip47MethodIcons = map[string]string{
@@ -57,6 +61,10 @@ var nip47MethodIcons = map[string]string{
 	NIP_47_MAKE_INVOICE_METHOD:      "invoice",
 	NIP_47_LOOKUP_INVOICE_METHOD:    "search",
 	NIP_47_LIST_TRANSACTIONS_METHOD: "transactions",
+	NIP_47_LOOKUP_USER_METHOD:       "search",
+	NIP_47_FETCH_QUOTE_METHOD:       "wallet",
+	NIP_47_EXECUTE_QUOTE_METHOD:     "transactions",
+	NIP_47_PAY_TO_ADDRESS_METHOD:    "lightning",
 }
 
 // TODO: move to models/Alby

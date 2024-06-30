@@ -135,7 +135,7 @@ type TLVRecord struct {
 }
 
 type Nip47LookupUserParams struct {
-	Address string `json:"address"`
+	Lud16 string `json:"lud16"`
 }
 
 type Nip47LookupUserResponse struct {

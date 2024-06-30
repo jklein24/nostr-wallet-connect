@@ -690,13 +690,12 @@ func (svc *UmaNwcAdapterService) AuthHandler(c echo.Context) error {
 func (svc *UmaNwcAdapterService) CallbackHandler(c echo.Context) error {
 	userJwt := c.QueryParam("token")
 	token, err := jwt.ParseWithClaims(userJwt, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(svc.cfg.CookieSecret), nil
+		return jwt.ParseECPublicKeyFromPEM([]byte(svc.cfg.UmaVaspJwtPubKey))
 	})
 	if err != nil {
 		return err
 	}
 	claims := token.Claims.(jwt.MapClaims)
-	// TODO: Switch to real oauth flow here when that's done on the uma side
 
 	user := User{}
 	umaAddress := claims["address"].(string)
@@ -704,14 +703,37 @@ func (svc *UmaNwcAdapterService) CallbackHandler(c echo.Context) error {
 	svc.db.FirstOrInit(&user, User{AlbyIdentifier: claims["sub"].(string)})
 
 	// TODO: Should update the expiry of the claims when we create the secret
-	delete(claims, "exp")
-	newJwt := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	newTokenStr, err := newJwt.SignedString([]byte(svc.cfg.CookieSecret))
+	tok := &oauth2.Token{
+		AccessToken: userJwt,
+		TokenType:   "Bearer", // Use bearer or omit when it's a real token
+	}
+	client := svc.oauthConf.Client(c.Request().Context(), tok)
+
+	body := bytes.NewBuffer([]byte{})
+	payload := &uma.TokenRequest{
+		// TODO: Switch to real permissions when this moves to the right place.
+		Permissions: []string{"all"},
+	}
+	err = json.NewEncoder(body).Encode(payload)
+	if err != nil {
+		return err
+	}
+	newTokenResp, err := client.Post(svc.cfg.UmaTokenUrl, "application/json", body)
+	if err != nil {
+		return err
+	}
+	if newTokenResp.StatusCode != 200 {
+		return errors.New("failed to get new token")
+	}
+	newToken := &uma.TokenResponse{}
+	err = json.NewDecoder(newTokenResp.Body).Decode(newToken)
 	if err != nil {
 		return err
 	}
 
-	user.AccessToken = newTokenStr
+	// NOTE: This should really be set on the app, not the user, but I don't want to deal
+	// with refactoring this application if we're building our own NWC server.
+	user.AccessToken = newToken.Token
 	user.LightningAddress = umaAddress
 	svc.db.Save(&user)
 

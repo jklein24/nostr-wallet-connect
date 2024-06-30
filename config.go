@@ -37,5 +37,7 @@ type Config struct {
 	DatabaseConnMaxLifetime int    `envconfig:"DATABASE_CONN_MAX_LIFETIME" default:"1800"` // 30 minutes
 	UmaAPIURL               string `envconfig:"UMA_API_URL" default:"http://localhost:5000/umanwc"`
 	UmaLoginUrl             string `envconfig:"UMA_LOGIN_URL"`
+	UmaTokenUrl             string `envconfig:"UMA_TOKEN_URL"`
+	UmaVaspJwtPubKey        string `envconfig:"UMA_VASP_JWT_PUBKEY"`
 	IdentityPubkey          string
 }

@@ -43,7 +43,7 @@ func (svc *Service) HandleLookupUserEvent(ctx context.Context, request *nip47.Ni
 	lookupUserParams := &nip47.Nip47LookupUserParams{}
 	err = json.Unmarshal(request.Params, lookupUserParams)
 	// TODO: Validate the address more.
-	if err != nil || lookupUserParams.Address == "" {
+	if err != nil || lookupUserParams.Lud16 == "" {
 		svc.Logger.WithFields(logrus.Fields{
 			"eventId":   event.ID,
 			"eventKind": event.Kind,
@@ -66,7 +66,7 @@ func (svc *Service) HandleLookupUserEvent(ctx context.Context, request *nip47.Ni
 		"appId":     app.ID,
 	}).Info("Fetching user")
 
-	response, err := svc.lnClient.LookupUser(ctx, event.PubKey, lookupUserParams.Address)
+	response, err := svc.lnClient.LookupUser(ctx, event.PubKey, lookupUserParams.Lud16)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"eventId":   event.ID,

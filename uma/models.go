@@ -66,6 +66,15 @@ type MakeInvoiceRequest struct {
 	Expiry          int64  `json:"expiry"`
 }
 
+type TokenRequest struct {
+	Permissions []string `json:"permissions"`
+	Expiration  *int64   `json:"expiration"`
+}
+
+type TokenResponse struct {
+	Token string `json:"token"`
+}
+
 type Currency struct {
 	// Code is the ISO 4217 (if applicable) currency code (eg. "USD"). For cryptocurrencies, this will  be a ticker
 	// symbol, such as BTC for Bitcoin.
