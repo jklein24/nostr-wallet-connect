@@ -46,6 +46,7 @@ func (svc *Service) HandleFetchQuoteEvent(ctx context.Context, request *nip47.Ni
 		svc.Logger.WithFields(logrus.Fields{
 			"eventId":   event.ID,
 			"eventKind": event.Kind,
+			"receiver":  getQuoteParams.Receiver,
 			"appId":     app.ID,
 		}).Infof("Failed to fetch quote: %v", err)
 		nostrEvent.State = NOSTR_EVENT_STATE_HANDLER_ERROR

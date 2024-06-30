@@ -157,13 +157,14 @@ type Nip47FetchQuoteParams struct {
 
 type Nip47Quote struct {
 	PaymentHash           string  `json:"payment_hash"`
-	Expiry                int64   `json:"expiry"`
+	ExpiresAt             int64   `json:"expires_at"`
 	Multiplier            float64 `json:"multiplier"`
 	SendingCurrencyCode   string  `json:"sending_currency_code"`
 	ReceivingCurrencyCode string  `json:"receiving_currency_code"`
-	Fees                  int64   `json:"fees"`
+	Fee                   int64   `json:"fee"`
 	TotalReceivingAmount  int64   `json:"total_receiving_amount"`
 	TotalSendingAmount    int64   `json:"total_sending_amount"`
+	LockedCurrencySide    string  `json:"locked_currency_side"`
 }
 
 type Nip47ExecuteQuoteParams struct {

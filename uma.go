@@ -392,10 +392,12 @@ func (svc *UmaNwcAdapterService) FetchQuote(ctx context.Context, senderPubkey st
 		if err != nil {
 			return nil, err
 		}
+		responsePayload.LockedCurrencySide = params.LockedCurrencySide
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
 			"appId":        app.ID,
 			"userId":       app.User.ID,
+			"quote":        responsePayload,
 		}).Info("Fetching quote successful")
 
 		return responsePayload, nil
