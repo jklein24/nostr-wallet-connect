@@ -129,3 +129,10 @@ func (r *LookupUserResponse) ToNip47LookupUserResponse() *nip47.Nip47LookupUserR
 		Currencies: currencies,
 	}
 }
+
+type PayToAddressRequest struct {
+	SendingCurrencyAmount int64  `json:"sending_currency_amount"`
+	ReceiverAddress       string `json:"receiver_address"`
+	ReceivingCurrencyCode string `json:"receiving_currency_code"`
+	SendingCurrencyCode   string `json:"sending_currency_code"`
+}

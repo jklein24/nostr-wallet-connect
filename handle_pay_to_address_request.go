@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/getAlby/nostr-wallet-connect/nip47"
 
@@ -9,8 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (svc *Service) HandlePayAddressEvent(ctx context.Context, request *nip47.Nip47Request, event *nostr.Event, app App, ss []byte) (result *nostr.Event, err error) {
-
+func (svc *Service) HandlePayToAddressEvent(ctx context.Context, request *nip47.Nip47Request, event *nostr.Event, app App, ss []byte) (result *nostr.Event, err error) {
 	nostrEvent := NostrEvent{App: app, NostrId: event.ID, Content: event.Content, State: "received"}
 	err = svc.db.Create(&nostrEvent).Error
 	if err != nil {
@@ -39,44 +39,54 @@ func (svc *Service) HandlePayAddressEvent(ctx context.Context, request *nip47.Ni
 			}}, ss)
 	}
 
-	svc.Logger.WithFields(logrus.Fields{
-		"eventId":   event.ID,
-		"eventKind": event.Kind,
-		"appId":     app.ID,
-	}).Info("Fetching node info")
-
-	info, err := svc.lnClient.GetInfo(ctx, event.PubKey)
-	if err != nil {
+	payToAddressParams := &nip47.Nip47PayToAddressParams{}
+	err = json.Unmarshal(request.Params, payToAddressParams)
+	// TODO: Validate the address more.
+	if err != nil || payToAddressParams.Receiver.Lud16 == nil || *payToAddressParams.Receiver.Lud16 == "" {
 		svc.Logger.WithFields(logrus.Fields{
 			"eventId":   event.ID,
 			"eventKind": event.Kind,
 			"appId":     app.ID,
-		}).Infof("Failed to fetch node info: %v", err)
+		}).Infof("Failed to pay address: %v", err)
 		nostrEvent.State = NOSTR_EVENT_STATE_HANDLER_ERROR
 		svc.db.Save(&nostrEvent)
 		return svc.createResponse(event, nip47.Nip47Response{
 			ResultType: request.Method,
 			Error: &nip47.Nip47Error{
 				Code:    NIP_47_ERROR_INTERNAL,
-				Message: fmt.Sprintf("Something went wrong while fetching node info: %s", err.Error()),
+				Message: fmt.Sprintf("Invalid params: %s", err.Error()),
 			},
 		}, ss)
 	}
 
-	responsePayload := &nip47.Nip47GetInfoResponse{
-		Alias:       info.Alias,
-		Color:       info.Color,
-		Pubkey:      info.Pubkey,
-		Network:     info.Network,
-		BlockHeight: info.BlockHeight,
-		BlockHash:   info.BlockHash,
-		Methods:     svc.GetMethods(&app),
+	svc.Logger.WithFields(logrus.Fields{
+		"eventId":   event.ID,
+		"eventKind": event.Kind,
+		"appId":     app.ID,
+	}).Info("Paying to address")
+
+	response, err := svc.lnClient.PayToAddress(ctx, event.PubKey, *payToAddressParams)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"eventId":   event.ID,
+			"eventKind": event.Kind,
+			"appId":     app.ID,
+		}).Infof("Failed to pay address: %v", err)
+		nostrEvent.State = NOSTR_EVENT_STATE_HANDLER_ERROR
+		svc.db.Save(&nostrEvent)
+		return svc.createResponse(event, nip47.Nip47Response{
+			ResultType: request.Method,
+			Error: &nip47.Nip47Error{
+				Code:    NIP_47_ERROR_INTERNAL,
+				Message: fmt.Sprintf("Something went wrong while paying: %s", err.Error()),
+			},
+		}, ss)
 	}
 
 	nostrEvent.State = NOSTR_EVENT_STATE_HANDLER_EXECUTED
 	svc.db.Save(&nostrEvent)
 	return svc.createResponse(event, nip47.Nip47Response{
 		ResultType: request.Method,
-		Result:     responsePayload,
+		Result:     response,
 	}, ss)
 }

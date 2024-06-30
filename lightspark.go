@@ -129,6 +129,18 @@ func (svc *LightsparkService) LookupUser(ctx context.Context, senderPubkey strin
 	return nil, errors.New("Not implemented")
 }
 
+func (svc *LightsparkService) FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (svc *LightsparkService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error) {
+	return "", errors.New("Not implemented")
+}
+
+func (svc *LightsparkService) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {
+	return nil, errors.New("Not implemented")
+}
+
 func (svc *LightsparkService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error) {
 	var descriptionHashBytes []byte
 

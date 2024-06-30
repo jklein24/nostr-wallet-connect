@@ -31,6 +31,9 @@ type LNClient interface {
 	LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *nip47.Nip47Transaction, err error)
 	ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []nip47.Nip47Transaction, err error)
 	LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error)
+	FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error)
+	ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error)
+	PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error)
 }
 
 // wrap it again :sweat_smile:
@@ -164,6 +167,18 @@ func (svc *LNDService) GetInfo(ctx context.Context, senderPubkey string) (info *
 }
 
 func (svc *LNDService) LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (svc *LNDService) FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (svc *LNDService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error) {
+	return "", errors.New("Not implemented")
+}
+
+func (svc *LNDService) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {
 	return nil, errors.New("Not implemented")
 }
 

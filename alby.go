@@ -308,6 +308,18 @@ func (svc *AlbyOAuthService) LookupUser(ctx context.Context, senderPubkey string
 	return nil, errors.New("Not implemented")
 }
 
+func (svc *AlbyOAuthService) FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (svc *AlbyOAuthService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error) {
+	return "", errors.New("Not implemented")
+}
+
+func (svc *AlbyOAuthService) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {
+	return nil, errors.New("Not implemented")
+}
+
 func (svc *AlbyOAuthService) GetBalance(ctx context.Context, senderPubkey string) (balance int64, err error) {
 	app := App{}
 	err = svc.db.Preload("User").First(&app, &App{

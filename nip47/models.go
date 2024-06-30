@@ -141,3 +141,47 @@ type Nip47LookupUserParams struct {
 type Nip47LookupUserResponse struct {
 	Currencies []Nip47Currency `json:"currencies"`
 }
+
+type Nip47ReceiverAddress struct {
+	Lud16  *string `json:"lud16"`
+	Bolt12 *string `json:"bolt12"`
+}
+
+type Nip47FetchQuoteParams struct {
+	Receiver              Nip47ReceiverAddress `json:"receiver"`
+	SendingCurrencyCode   string               `json:"sending_currency_code"`
+	ReceivingCurrencyCode string               `json:"receiving_currency_code"`
+	LockedCurrencySide    string               `json:"locked_currency_side"`
+	LockedCurrencyAmount  int64                `json:"locked_currency_amount"`
+}
+
+type Nip47Quote struct {
+	PaymentHash           string  `json:"payment_hash"`
+	Expiry                int64   `json:"expiry"`
+	Multiplier            float64 `json:"multiplier"`
+	SendingCurrencyCode   string  `json:"sending_currency_code"`
+	ReceivingCurrencyCode string  `json:"receiving_currency_code"`
+	Fees                  int64   `json:"fees"`
+	TotalReceivingAmount  int64   `json:"total_receiving_amount"`
+	TotalSendingAmount    int64   `json:"total_sending_amount"`
+}
+
+type Nip47ExecuteQuoteParams struct {
+	PaymentHash string `json:"payment_hash"`
+}
+
+type Nip47ExecuteQuoteResponse struct {
+	Preimage string `json:"preimage"`
+}
+
+type Nip47PayToAddressParams struct {
+	Receiver              Nip47ReceiverAddress `json:"receiver"`
+	SendingCurrencyCode   string               `json:"sending_currency_code"`
+	ReceivingCurrencyCode *string              `json:"receiving_currency_code"`
+	SendingCurrencyAmount int64                `json:"sending_currency_amount"`
+}
+
+type Nip47PayToAddressResponse struct {
+	Preimage string      `json:"preimage"`
+	Quote    *Nip47Quote `json:"quote,omitempty"`
+}

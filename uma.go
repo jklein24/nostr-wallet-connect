@@ -344,6 +344,203 @@ func (svc *UmaNwcAdapterService) LookupUser(ctx context.Context, senderPubkey st
 	return nil, errors.New(errorPayload.Message)
 }
 
+func (svc *UmaNwcAdapterService) FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"params":       params,
+		}).Errorf("App not found: %v", err)
+		return nil, err
+	}
+	tok, err := svc.FetchUserToken(ctx, *app)
+	if err != nil {
+		return nil, err
+	}
+	client := svc.oauthConf.Client(ctx, tok)
+
+	body := bytes.NewBuffer([]byte{})
+	urlParams := url.Values{}
+	urlParams.Add("locked_currency_amount", strconv.FormatInt(params.LockedCurrencyAmount, 10))
+	urlParams.Add("locked_currency_side", params.LockedCurrencySide)
+	urlParams.Add("receiving_currency_code", params.ReceivingCurrencyCode)
+	urlParams.Add("sending_currency_code", params.SendingCurrencyCode)
+	urlParams.Add("receiving_address", *params.Receiver.Lud16)
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/quote?%s", svc.cfg.UmaAPIURL, urlParams.Encode()), body)
+	if err != nil {
+		svc.Logger.WithError(err).Errorf("Error creating quote request")
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "NWC")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"appId":        app.ID,
+			"userId":       app.User.ID,
+		}).Errorf("Failed to fetch quote: %v", err)
+		return nil, err
+	}
+
+	if resp.StatusCode < 300 {
+		responsePayload := &nip47.Nip47Quote{}
+		err = json.NewDecoder(resp.Body).Decode(responsePayload)
+		if err != nil {
+			return nil, err
+		}
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"appId":        app.ID,
+			"userId":       app.User.ID,
+		}).Info("Fetching quote successful")
+
+		return responsePayload, nil
+	}
+
+	errorPayload := &ErrorResponse{}
+	err = json.NewDecoder(resp.Body).Decode(errorPayload)
+	svc.Logger.WithFields(logrus.Fields{
+		"senderPubkey": senderPubkey,
+		"appId":        app.ID,
+		"userId":       app.User.ID,
+	}).Errorf("Fetching quote failed %s", errorPayload.Message)
+	return nil, errors.New(errorPayload.Message)
+}
+
+func (svc *UmaNwcAdapterService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"paymentHash":  paymentHash,
+		}).Errorf("App not found: %v", err)
+		return "", err
+	}
+	tok, err := svc.FetchUserToken(ctx, *app)
+	if err != nil {
+		return "", err
+	}
+	client := svc.oauthConf.Client(ctx, tok)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/quote/%s", svc.cfg.UmaAPIURL, paymentHash), nil)
+	if err != nil {
+		svc.Logger.WithError(err).Errorf("Error executing quote request")
+		return "", err
+	}
+
+	req.Header.Set("User-Agent", "NWC")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"appId":        app.ID,
+			"userId":       app.User.ID,
+		}).Errorf("Failed to execute quote: %v", err)
+		return "", err
+	}
+
+	if resp.StatusCode < 300 {
+		responsePayload := &nip47.Nip47ExecuteQuoteResponse{}
+		err = json.NewDecoder(resp.Body).Decode(responsePayload)
+		if err != nil {
+			return "", err
+		}
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"appId":        app.ID,
+			"userId":       app.User.ID,
+		}).Info("Executing quote successful")
+
+		return responsePayload.Preimage, nil
+	}
+
+	errorPayload := &ErrorResponse{}
+	err = json.NewDecoder(resp.Body).Decode(errorPayload)
+	svc.Logger.WithFields(logrus.Fields{
+		"senderPubkey": senderPubkey,
+		"appId":        app.ID,
+		"userId":       app.User.ID,
+	}).Errorf("Executing quote failed %s", errorPayload.Message)
+	return "", errors.New(errorPayload.Message)
+}
+
+func (svc *UmaNwcAdapterService) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {
+	app, err := svc.appFromPubkey(senderPubkey)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"params":       params,
+		}).Errorf("App not found: %v", err)
+		return nil, err
+	}
+	tok, err := svc.FetchUserToken(ctx, *app)
+	if err != nil {
+		return nil, err
+	}
+	client := svc.oauthConf.Client(ctx, tok)
+
+	body := bytes.NewBuffer([]byte{})
+	payload := &uma.PayToAddressRequest{
+		SendingCurrencyAmount: params.SendingCurrencyAmount,
+		ReceiverAddress:       *params.Receiver.Lud16,
+		ReceivingCurrencyCode: *params.ReceivingCurrencyCode,
+		SendingCurrencyCode:   params.SendingCurrencyCode,
+	}
+	err = json.NewEncoder(body).Encode(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/payments/lnurl", svc.cfg.UmaAPIURL), body)
+	if err != nil {
+		svc.Logger.WithError(err).Errorf("Error creating quote request")
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "NWC")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"appId":        app.ID,
+			"userId":       app.User.ID,
+		}).Errorf("Failed to fetch quote: %v", err)
+		return nil, err
+	}
+
+	if resp.StatusCode < 300 {
+		responsePayload := &nip47.Nip47PayToAddressResponse{}
+		err = json.NewDecoder(resp.Body).Decode(responsePayload)
+		if err != nil {
+			return nil, err
+		}
+		svc.Logger.WithFields(logrus.Fields{
+			"senderPubkey": senderPubkey,
+			"appId":        app.ID,
+			"userId":       app.User.ID,
+		}).Info("Pay to address successful")
+
+		return responsePayload, nil
+	}
+
+	errorPayload := &ErrorResponse{}
+	err = json.NewDecoder(resp.Body).Decode(errorPayload)
+	svc.Logger.WithFields(logrus.Fields{
+		"senderPubkey": senderPubkey,
+		"appId":        app.ID,
+		"userId":       app.User.ID,
+	}).Errorf("Fetching quote failed %s", errorPayload.Message)
+	return nil, errors.New(errorPayload.Message)
+}
+
 func (svc *UmaNwcAdapterService) GetBalance(ctx context.Context, senderPubkey string) (balance int64, err error) {
 	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
