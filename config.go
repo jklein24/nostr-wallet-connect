@@ -38,6 +38,7 @@ type Config struct {
 	UmaAPIURL               string `envconfig:"UMA_API_URL" default:"http://localhost:5000/umanwc"`
 	UmaLoginUrl             string `envconfig:"UMA_LOGIN_URL"`
 	UmaTokenUrl             string `envconfig:"UMA_TOKEN_URL"`
+	UmaRedirectUrl          string `envconfig:"UMA_REDIRECT_URL"`
 	UmaVaspJwtPubKey        string `envconfig:"UMA_VASP_JWT_PUBKEY"`
 	IdentityPubkey          string
 }

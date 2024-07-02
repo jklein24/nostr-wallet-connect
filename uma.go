@@ -38,7 +38,7 @@ func NewUmaNwcAdapterService(svc *Service, e *echo.Echo) (result *UmaNwcAdapterS
 			AuthURL:   svc.cfg.UmaLoginUrl,
 			AuthStyle: 2, // use HTTP Basic Authorization https://pkg.go.dev/golang.org/x/oauth2#AuthStyle
 		},
-		RedirectURL: svc.cfg.OAuthRedirectUrl,
+		RedirectURL: svc.cfg.UmaRedirectUrl,
 	}
 
 	umaSvc := &UmaNwcAdapterService{
