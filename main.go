@@ -4,9 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	_ "github.com/lib/pq"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,11 +36,37 @@ import (
 func main() {
 
 	// Load config from environment variables / .env file
-	godotenv.Load(".env")
+	envFile := ".env"
+	if os.Getenv("NWC_ENV_FILE") != "" {
+		envFile = os.Getenv("NWC_ENV_FILE")
+	}
+	godotenv.Load(envFile)
 	cfg := &Config{}
 	err := envconfig.Process("", cfg)
 	if err != nil {
 		log.Fatalf("Error loading environment variables: %v", err)
+	}
+	// Load from secrets if available.
+	if _, err := os.Stat(cfg.UmaVaspJwtPubKeySecretFile); err == nil {
+		pubkeyBytes, err := os.ReadFile(cfg.UmaVaspJwtPubKeySecretFile)
+		if err != nil {
+			log.Fatalf("Error reading UMA VASP JWT public key from file: %v", err)
+		}
+		cfg.UmaVaspJwtPubKey = string(pubkeyBytes)
+	}
+	if _, err := os.Stat(cfg.CookieSecretFile); err == nil {
+		cookieSecretBytes, err := os.ReadFile(cfg.CookieSecretFile)
+		if err != nil {
+			log.Fatalf("Error reading cookie secret from file: %v", err)
+		}
+		cfg.CookieSecret = string(cookieSecretBytes)
+	}
+	if _, err := os.Stat(cfg.NostrSecretKeyFile); err == nil {
+		nostrPrivKey, err := os.ReadFile(cfg.NostrSecretKeyFile)
+		if err != nil {
+			log.Fatalf("Error reading Nostr private key from file: %v", err)
+		}
+		cfg.NostrSecretKey = string(nostrPrivKey)
 	}
 
 	var db *gorm.DB
@@ -53,7 +83,36 @@ func main() {
 				log.Fatalf("Failed to open DB %v", err)
 			}
 		} else {
-			db, err = gorm.Open(postgres.Open(cfg.DatabaseUri), &gorm.Config{})
+			if cfg.UseRdsIamAuth {
+				log.Infof("Using RDS IAM auth for %s", cfg.DatabaseUri)
+				cfg.DatabaseEndpoint = "dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"
+				cfg.DatabaseUser = "uda"
+				cfg.DatabaseRegion = "us-west-2"
+				log.Infof("Endpoint: %s", cfg.DatabaseEndpoint)
+				log.Infof("Region: %s", cfg.DatabaseRegion)
+				authToken, err := generateAuthToken(cfg.DatabaseRegion, cfg.DatabaseEndpoint, cfg.DatabaseUser)
+				if err != nil {
+					log.Fatalf("Failed to generate auth token: %v", err)
+				}
+				// Strip the port off the endpoint:
+				dbHost := cfg.DatabaseEndpoint
+				dbPort := 5432
+				if strings.Contains(cfg.DatabaseEndpoint, ":") {
+					dbHost = strings.Split(cfg.DatabaseEndpoint, ":")[0]
+					dbPort, err = strconv.Atoi(strings.Split(cfg.DatabaseEndpoint, ":")[1])
+					if err != nil {
+						log.Fatalf("Failed to parse port from endpoint: %v", err)
+					}
+				}
+
+				cfg.DatabaseUri = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=verify-full sslrootcert=/etc/uma-dogfood/rds-ca.pem",
+					dbHost, dbPort, cfg.DatabaseUser, authToken, "nwc",
+				)
+				log.Infof("now it's - %s", cfg.DatabaseUri)
+			} else if cfg.DatabasePassword != "" {
+				cfg.DatabaseUri = fmt.Sprintf("user=%s password=%s dbname=%s host=%s sslmode=disable", cfg.DatabaseUser, cfg.DatabasePassword, "nwc", cfg.DatabaseUri)
+			}
+			db, err = gorm.Open(postgres.New(postgres.Config{DriverName: "pgx", DSN: fmt.Sprintf(cfg.DatabaseUri)}), &gorm.Config{})
 			if err != nil {
 				log.Fatalf("Failed to open DB %v", err)
 			}
@@ -224,6 +283,32 @@ func main() {
 		svc.Logger.Error(err)
 	}
 	svc.Logger.Info("Graceful shutdown completed. Goodbye.")
+}
+
+func generateAuthToken(region, endpoint, username string) (string, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		return "", err
+	}
+	return auth.BuildAuthToken(context.TODO(), endpoint, region, username, cfg.Credentials)
+	//sess, err := session.NewSession(&aws.Config{
+	//	Region: aws.String(region),
+	//})
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//authToken, err := rdsutils.BuildAuthToken(
+	//	endpoint,
+	//	region,
+	//	username,
+	//	sess.Config.Credentials,
+	//)
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//return authToken, nil
 }
 
 func (svc *Service) createFilters() nostr.Filters {

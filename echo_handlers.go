@@ -81,6 +81,12 @@ func (svc *Service) RegisterSharedRoutes(e *echo.Echo) {
 	e.GET("/logout", svc.LogoutHandler)
 	e.GET("/about", svc.AboutHandler)
 	e.GET("/", svc.IndexHandler)
+	e.GET("/-/ready", func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+	e.GET("/-/alive", func(c echo.Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
 }
 
 func (svc *Service) IndexHandler(c echo.Context) error {

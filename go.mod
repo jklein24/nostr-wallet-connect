@@ -5,11 +5,15 @@ go 1.21
 toolchain go1.21.3
 
 require (
+	github.com/aws/aws-sdk-go-v2/config v1.27.24
+	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.4.13
 	github.com/davrux/echo-logrus/v4 v4.0.3
 	github.com/go-gormigrate/gormigrate/v2 v2.1.1
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/sessions v1.2.1
 	github.com/labstack/echo-contrib v0.14.1
 	github.com/labstack/echo/v4 v4.10.2
+	github.com/lib/pq v1.10.7
 	github.com/lightsparkdev/go-sdk v0.13.0
 	github.com/nbd-wtf/go-nostr v0.25.5
 	github.com/nbd-wtf/ln-decodepay v1.11.1
@@ -33,6 +37,18 @@ require (
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/aead/siphash v1.0.1 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.30.1 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.24 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.9 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.13 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.13 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.15 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.22.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.30.1 // indirect
+	github.com/aws/smithy-go v1.20.3 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd v0.24.0 // indirect
@@ -68,7 +84,6 @@ require (
 	github.com/gobwas/ws v1.2.0 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.3 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
@@ -98,7 +113,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
-	github.com/lib/pq v1.10.7 // indirect
 	github.com/lightninglabs/gozmq v0.0.0-20191113021534-d20a764486bf // indirect
 	github.com/lightninglabs/neutrino v0.14.2 // indirect
 	github.com/lightningnetwork/lightning-onion v1.2.0 // indirect
