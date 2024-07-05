@@ -927,6 +927,7 @@ func (svc *UmaNwcAdapterService) CallbackHandler(c echo.Context) error {
 	newToken := &uma.TokenResponse{}
 	err = json.NewDecoder(newTokenResp.Body).Decode(newToken)
 	if err != nil {
+		svc.Logger.Errorf("Failed to decode token response: %v", err)
 		return err
 	}
 

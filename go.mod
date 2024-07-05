@@ -7,6 +7,7 @@ toolchain go1.21.3
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.27.24
 	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.4.13
+	github.com/aws/aws-sdk-go-v2/service/rds v1.81.2
 	github.com/davrux/echo-logrus/v4 v4.0.3
 	github.com/go-gormigrate/gormigrate/v2 v2.1.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
@@ -107,6 +108,7 @@ require (
 	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.3.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jrick/logrotate v1.0.0 // indirect

@@ -52,21 +52,21 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error reading UMA VASP JWT public key from file: %v", err)
 		}
-		cfg.UmaVaspJwtPubKey = string(pubkeyBytes)
+		cfg.UmaVaspJwtPubKey = strings.TrimSpace(string(pubkeyBytes))
 	}
 	if _, err := os.Stat(cfg.CookieSecretFile); err == nil {
 		cookieSecretBytes, err := os.ReadFile(cfg.CookieSecretFile)
 		if err != nil {
 			log.Fatalf("Error reading cookie secret from file: %v", err)
 		}
-		cfg.CookieSecret = string(cookieSecretBytes)
+		cfg.CookieSecret = strings.TrimSpace(string(cookieSecretBytes))
 	}
 	if _, err := os.Stat(cfg.NostrSecretKeyFile); err == nil {
 		nostrPrivKey, err := os.ReadFile(cfg.NostrSecretKeyFile)
 		if err != nil {
 			log.Fatalf("Error reading Nostr private key from file: %v", err)
 		}
-		cfg.NostrSecretKey = string(nostrPrivKey)
+		cfg.NostrSecretKey = strings.TrimSpace(string(nostrPrivKey))
 	}
 
 	var db *gorm.DB
@@ -88,9 +88,8 @@ func main() {
 				cfg.DatabaseEndpoint = "dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"
 				cfg.DatabaseUser = "uda"
 				cfg.DatabaseRegion = "us-west-2"
-				log.Infof("Endpoint: %s", cfg.DatabaseEndpoint)
-				log.Infof("Region: %s", cfg.DatabaseRegion)
 				authToken, err := generateAuthToken(cfg.DatabaseRegion, cfg.DatabaseEndpoint, cfg.DatabaseUser)
+
 				if err != nil {
 					log.Fatalf("Failed to generate auth token: %v", err)
 				}
@@ -108,11 +107,10 @@ func main() {
 				cfg.DatabaseUri = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=verify-full sslrootcert=/etc/uma-dogfood/rds-ca.pem",
 					dbHost, dbPort, cfg.DatabaseUser, authToken, "nwc",
 				)
-				log.Infof("now it's - %s", cfg.DatabaseUri)
 			} else if cfg.DatabasePassword != "" {
 				cfg.DatabaseUri = fmt.Sprintf("user=%s password=%s dbname=%s host=%s sslmode=disable", cfg.DatabaseUser, cfg.DatabasePassword, "nwc", cfg.DatabaseUri)
 			}
-			db, err = gorm.Open(postgres.New(postgres.Config{DriverName: "pgx", DSN: fmt.Sprintf(cfg.DatabaseUri)}), &gorm.Config{})
+			db, err = gorm.Open(postgres.Open(cfg.DatabaseUri), &gorm.Config{})
 			if err != nil {
 				log.Fatalf("Failed to open DB %v", err)
 			}
@@ -168,6 +166,7 @@ func main() {
 		cfg.NostrSecretKey = identity.Privkey
 	}
 
+	log.Println(cfg.NostrSecretKey)
 	identityPubkey, err := nostr.GetPublicKey(cfg.NostrSecretKey)
 	if err != nil {
 		log.Fatalf("Error converting nostr privkey to pubkey: %v", err)
@@ -286,29 +285,11 @@ func main() {
 }
 
 func generateAuthToken(region, endpoint, username string) (string, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
 	if err != nil {
 		return "", err
 	}
 	return auth.BuildAuthToken(context.TODO(), endpoint, region, username, cfg.Credentials)
-	//sess, err := session.NewSession(&aws.Config{
-	//	Region: aws.String(region),
-	//})
-	//if err != nil {
-	//	return "", err
-	//}
-	//
-	//authToken, err := rdsutils.BuildAuthToken(
-	//	endpoint,
-	//	region,
-	//	username,
-	//	sess.Config.Credentials,
-	//)
-	//if err != nil {
-	//	return "", err
-	//}
-	//
-	//return authToken, nil
 }
 
 func (svc *Service) createFilters() nostr.Filters {
