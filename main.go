@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/jackc/pgx/v5"
 	_ "github.com/lib/pq"
 	"net/http"
 	"os"
@@ -84,16 +85,8 @@ func main() {
 			}
 		} else {
 			if cfg.UseRdsIamAuth {
-				log.Infof("Using RDS IAM auth for %s", cfg.DatabaseUri)
-				cfg.DatabaseEndpoint = "dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"
-				cfg.DatabaseUser = "uda"
-				cfg.DatabaseRegion = "us-west-2"
-				authToken, err := generateAuthToken(cfg.DatabaseRegion, cfg.DatabaseEndpoint, cfg.DatabaseUser)
-
-				if err != nil {
-					log.Fatalf("Failed to generate auth token: %v", err)
-				}
 				// Strip the port off the endpoint:
+				cfg.DatabaseEndpoint = "dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"
 				dbHost := cfg.DatabaseEndpoint
 				dbPort := 5432
 				if strings.Contains(cfg.DatabaseEndpoint, ":") {
@@ -104,13 +97,24 @@ func main() {
 					}
 				}
 
-				cfg.DatabaseUri = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=verify-full sslrootcert=/etc/uma-dogfood/rds-ca.pem",
-					dbHost, dbPort, cfg.DatabaseUser, authToken, "nwc",
+				cfg.DatabaseUri = fmt.Sprintf("host=%s port=%d user=%s dbname=%s sslmode=verify-full sslrootcert=/etc/uma-dogfood/rds-ca.pem",
+					dbHost, dbPort, cfg.DatabaseUser, "nwc",
 				)
+				pgxConfig, err := pgx.ParseConfig(cfg.DatabaseUri)
+				if err != nil {
+					log.Fatalf("Failed to parse config: %v", err)
+				}
+				sqlDb = stdlib.OpenDB(*pgxConfig, stdlib.OptionBeforeConnect(refreshAccessToken()))
 			} else if cfg.DatabasePassword != "" {
 				cfg.DatabaseUri = fmt.Sprintf("user=%s password=%s dbname=%s host=%s sslmode=disable", cfg.DatabaseUser, cfg.DatabasePassword, "nwc", cfg.DatabaseUri)
 			}
-			db, err = gorm.Open(postgres.Open(cfg.DatabaseUri), &gorm.Config{})
+			var dialector gorm.Dialector
+			if sqlDb != nil {
+				dialector = postgres.New(postgres.Config{Conn: sqlDb})
+			} else {
+				dialector = postgres.Open(cfg.DatabaseUri)
+			}
+			db, err = gorm.Open(dialector, &gorm.Config{})
 			if err != nil {
 				log.Fatalf("Failed to open DB %v", err)
 			}
@@ -284,12 +288,46 @@ func main() {
 	svc.Logger.Info("Graceful shutdown completed. Goodbye.")
 }
 
-func generateAuthToken(region, endpoint, username string) (string, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+type tokenStruct struct {
+	Token     string
+	ExpiresOn time.Time
+}
+
+func generateAuthToken(ctx context.Context) (string, error) {
+	endpoint := "dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"
+	username := "uda"
+	region := "us-west-2"
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
 		return "", err
 	}
-	return auth.BuildAuthToken(context.TODO(), endpoint, region, username, cfg.Credentials)
+	return auth.BuildAuthToken(ctx, endpoint, region, username, cfg.Credentials)
+}
+
+func refreshAccessToken() func(ctx context.Context, config *pgx.ConnConfig) error {
+
+	accessToken := tokenStruct{}
+
+	return func(ctx context.Context, config *pgx.ConnConfig) error {
+		if accessToken.isExpired() {
+			tokenStr, err := generateAuthToken(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get new token: %w", err)
+			}
+			accessToken.Token = tokenStr
+			accessToken.ExpiresOn = time.Now().Add(time.Minute * 15)
+			log.Info("acquired new token for postgres", "expiry", accessToken.ExpiresOn)
+		}
+
+		config.Password = accessToken.Token
+		return nil
+	}
+}
+
+func (t *tokenStruct) isExpired() bool {
+	// expire the token a bit earlier, just to be safe
+	oneMinuteInFuture := time.Now().Add(time.Minute * 1)
+	return t.ExpiresOn.Before(oneMinuteInFuture)
 }
 
 func (svc *Service) createFilters() nostr.Filters {
