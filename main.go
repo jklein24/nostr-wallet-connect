@@ -85,8 +85,10 @@ func main() {
 			}
 		} else {
 			if cfg.UseRdsIamAuth {
-				// Strip the port off the endpoint:
+				// TODO: Remove after the next terraform push.
+				log.Infof("Endpoint from config: %s", cfg.DatabaseEndpoint)
 				cfg.DatabaseEndpoint = "dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"
+				// Strip the port off the endpoint:
 				dbHost := cfg.DatabaseEndpoint
 				dbPort := 5432
 				if strings.Contains(cfg.DatabaseEndpoint, ":") {
@@ -104,7 +106,7 @@ func main() {
 				if err != nil {
 					log.Fatalf("Failed to parse config: %v", err)
 				}
-				sqlDb = stdlib.OpenDB(*pgxConfig, stdlib.OptionBeforeConnect(refreshAccessToken()))
+				sqlDb = stdlib.OpenDB(*pgxConfig, stdlib.OptionBeforeConnect(refreshAccessToken(cfg.AwsDatabaseRegion)))
 			} else if cfg.DatabasePassword != "" {
 				cfg.DatabaseUri = fmt.Sprintf("user=%s password=%s dbname=%s host=%s sslmode=disable", cfg.DatabaseUser, cfg.DatabasePassword, "nwc", cfg.DatabaseUri)
 			}
@@ -293,10 +295,8 @@ type tokenStruct struct {
 	ExpiresOn time.Time
 }
 
-func generateAuthToken(ctx context.Context) (string, error) {
-	endpoint := "dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"
-	username := "uda"
-	region := "us-west-2"
+func generateAuthToken(ctx context.Context, host string, port uint16, username string, region string) (string, error) {
+	endpoint := fmt.Sprintf("%s:%d", host, port)
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
 		return "", err
@@ -304,13 +304,13 @@ func generateAuthToken(ctx context.Context) (string, error) {
 	return auth.BuildAuthToken(ctx, endpoint, region, username, cfg.Credentials)
 }
 
-func refreshAccessToken() func(ctx context.Context, config *pgx.ConnConfig) error {
+func refreshAccessToken(region string) func(ctx context.Context, config *pgx.ConnConfig) error {
 
 	accessToken := tokenStruct{}
 
 	return func(ctx context.Context, config *pgx.ConnConfig) error {
 		if accessToken.isExpired() {
-			tokenStr, err := generateAuthToken(ctx)
+			tokenStr, err := generateAuthToken(ctx, config.Host, config.Port, config.User, region)
 			if err != nil {
 				return fmt.Errorf("failed to get new token: %w", err)
 			}

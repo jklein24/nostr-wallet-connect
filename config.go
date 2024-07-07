@@ -46,7 +46,7 @@ type Config struct {
 	IdentityPubkey             string
 	DatabaseUser               string `envconfig:"DATABASE_USER" default:"uda"`
 	DatabasePassword           string `envconfig:"DATABASE_PASSWORD"`
-	DatabaseRegion             string `envconfig:"DATABASE_REGION" default:"us-west-2"`
+	AwsDatabaseRegion          string `envconfig:"AWS_REGION"`
 	DatabaseEndpoint           string `envconfig:"DATABASE_ENDPOINT" default:"dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"`
 	UseRdsIamAuth              bool   `envconfig:"RDS_IAM_AUTH"`
 }
