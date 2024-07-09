@@ -413,25 +413,25 @@ func (svc *UmaNwcAdapterService) FetchQuote(ctx context.Context, senderPubkey st
 	return nil, errors.New(errorPayload.Message)
 }
 
-func (svc *UmaNwcAdapterService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error) {
+func (svc *UmaNwcAdapterService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (response *nip47.Nip47ExecuteQuoteResponse, err error) {
 	app, err := svc.appFromPubkey(senderPubkey)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
 			"paymentHash":  paymentHash,
 		}).Errorf("App not found: %v", err)
-		return "", err
+		return nil, err
 	}
 	tok, err := svc.FetchUserToken(ctx, *app)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	client := svc.oauthConf.Client(ctx, tok)
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/quote/%s", svc.cfg.UmaAPIURL, paymentHash), nil)
 	if err != nil {
 		svc.Logger.WithError(err).Errorf("Error executing quote request")
-		return "", err
+		return nil, err
 	}
 
 	req.Header.Set("User-Agent", "NWC")
@@ -444,14 +444,14 @@ func (svc *UmaNwcAdapterService) ExecuteQuote(ctx context.Context, senderPubkey 
 			"appId":        app.ID,
 			"userId":       app.User.ID,
 		}).Errorf("Failed to execute quote: %v", err)
-		return "", err
+		return nil, err
 	}
 
 	if resp.StatusCode < 300 {
 		responsePayload := &nip47.Nip47ExecuteQuoteResponse{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		svc.Logger.WithFields(logrus.Fields{
 			"senderPubkey": senderPubkey,
@@ -459,7 +459,7 @@ func (svc *UmaNwcAdapterService) ExecuteQuote(ctx context.Context, senderPubkey 
 			"userId":       app.User.ID,
 		}).Info("Executing quote successful")
 
-		return responsePayload.Preimage, nil
+		return responsePayload, nil
 	}
 
 	errorPayload := &ErrorResponse{}
@@ -469,7 +469,7 @@ func (svc *UmaNwcAdapterService) ExecuteQuote(ctx context.Context, senderPubkey 
 		"appId":        app.ID,
 		"userId":       app.User.ID,
 	}).Errorf("Executing quote failed %s", errorPayload.Message)
-	return "", errors.New(errorPayload.Message)
+	return nil, errors.New(errorPayload.Message)
 }
 
 func (svc *UmaNwcAdapterService) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {

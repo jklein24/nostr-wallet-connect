@@ -175,6 +175,10 @@ func (svc *Service) HandleEvent(ctx context.Context, event *nostr.Event) (result
 		if err != nil {
 			return nil, err
 		}
+		svc.Logger.WithFields(logrus.Fields{
+			"eventId":   event.ID,
+			"eventKind": event.Kind,
+		}).Errorf("The public key does not have a wallet connected")
 		resp, _ := svc.createResponse(event, nip47.Nip47Response{
 			Error: &nip47.Nip47Error{
 				Code:    NIP_47_ERROR_UNAUTHORIZED,

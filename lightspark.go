@@ -133,8 +133,8 @@ func (svc *LightsparkService) FetchQuote(ctx context.Context, senderPubkey strin
 	return nil, errors.New("Not implemented")
 }
 
-func (svc *LightsparkService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error) {
-	return "", errors.New("Not implemented")
+func (svc *LightsparkService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (response *nip47.Nip47ExecuteQuoteResponse, err error) {
+	return nil, errors.New("Not implemented")
 }
 
 func (svc *LightsparkService) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {

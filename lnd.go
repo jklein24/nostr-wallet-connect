@@ -32,7 +32,7 @@ type LNClient interface {
 	ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []nip47.Nip47Transaction, err error)
 	LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error)
 	FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error)
-	ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error)
+	ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (response *nip47.Nip47ExecuteQuoteResponse, err error)
 	PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error)
 }
 
@@ -174,8 +174,8 @@ func (svc *LNDService) FetchQuote(ctx context.Context, senderPubkey string, para
 	return nil, errors.New("Not implemented")
 }
 
-func (svc *LNDService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error) {
-	return "", errors.New("Not implemented")
+func (svc *LNDService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (response *nip47.Nip47ExecuteQuoteResponse, err error) {
+	return nil, errors.New("Not implemented")
 }
 
 func (svc *LNDService) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {

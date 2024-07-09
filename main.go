@@ -85,9 +85,6 @@ func main() {
 			}
 		} else {
 			if cfg.UseRdsIamAuth {
-				// TODO: Remove after the next terraform push.
-				log.Infof("Endpoint from config: %s", cfg.DatabaseEndpoint)
-				cfg.DatabaseEndpoint = "dev-uma-dogfood.czgjn8lg0uxg.us-west-2.rds.amazonaws.com:5432"
 				// Strip the port off the endpoint:
 				dbHost := cfg.DatabaseEndpoint
 				dbPort := 5432
