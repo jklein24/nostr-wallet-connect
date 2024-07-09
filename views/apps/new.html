@@ -39,6 +39,7 @@
         <input type="hidden" name="ExpiresAt" id="expires-at" value="{{.ExpiresAt}}">
         <input type="hidden" name="MaxAmount" id="max-amount" value={{if .MaxAmount}}{{.MaxAmount}}{{else}}{{"100000"}}{{end}}>
         <input type="hidden" name="BudgetRenewal" id="budget-renewal" value={{if .BudgetRenewal}}{{.BudgetRenewal}}{{else}}{{"monthly"}}{{end}}>
+        <input type="hidden" name="IsOAuth" id="is-oauth" value={{if .IsOAuth}}{{.IsOAuth}}{{else}}{{"false"}}{{end}}>
       </div>
 
       <div class="flex justify-between items-center mb-2 text-gray-800 dark:text-white">

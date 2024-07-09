@@ -5,11 +5,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/go-oauth2/oauth2/v4/manage"
+	"github.com/go-oauth2/oauth2/v4/server"
 	"html/template"
 	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
+	oauth2gorm "src.techknowlogick.com/oauth2-gorm"
 	"strconv"
 	"strings"
 	"time"
@@ -45,7 +48,7 @@ func (t *TemplateRegistry) Render(w io.Writer, name string, data interface{}, c 
 	return tmpl.ExecuteTemplate(w, "layout.html", data)
 }
 
-func (svc *Service) RegisterSharedRoutes(e *echo.Echo) {
+func (svc *Service) RegisterSharedRoutes(e *echo.Echo, cookieStore *sessions.CookieStore) {
 
 	templates := make(map[string]*template.Template)
 	templates["apps/index.html"] = template.Must(template.ParseFS(embeddedViews, "views/apps/index.html", "views/layout.html"))
@@ -66,8 +69,11 @@ func (svc *Service) RegisterSharedRoutes(e *echo.Echo) {
 	e.Use(middleware.RequestID())
 	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 		TokenLookup: "form:_csrf",
+		Skipper: func(c echo.Context) bool {
+			return c.Request().URL.Path == "/oauth2/token"
+		},
 	}))
-	e.Use(session.Middleware(sessions.NewCookieStore([]byte(svc.cfg.CookieSecret))))
+	e.Use(session.Middleware(cookieStore))
 	e.Use(ddEcho.Middleware(ddEcho.WithServiceName("nostr-wallet-connect")))
 
 	assetSubdir, _ := fs.Sub(embeddedAssets, "public")
@@ -86,6 +92,60 @@ func (svc *Service) RegisterSharedRoutes(e *echo.Echo) {
 	})
 	e.GET("/-/alive", func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK")
+	})
+}
+
+func (svc *Service) RegisterOAuthRoutes(e *echo.Echo, cookieStore *sessions.CookieStore) {
+	manager := manage.NewDefaultManager()
+	manager.SetAuthorizeCodeTokenCfg(manage.DefaultAuthorizeCodeTokenCfg)
+	tokenStore := oauth2gorm.NewTokenStoreWithDB(&oauth2gorm.Config{}, svc.db, 0)
+	manager.MapTokenStorage(tokenStore)
+	clientStore := NostrClientStore{}
+	manager.MapClientStorage(clientStore)
+
+	//manager.MapAccessGenerate()
+
+	srv := server.NewServer(server.NewConfig(), manager)
+	srv.SetClientInfoHandler(server.ClientFormHandler)
+
+	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+		sess, err := cookieStore.Get(r, CookieName)
+		if err != nil {
+			return "", err
+		}
+		userIDPtr := sess.Values["user_id"]
+		if userIDPtr == nil {
+			return "", errors.New("user not found")
+		}
+		userIDInt := userIDPtr.(uint)
+		userID = strconv.Itoa(int(userIDInt))
+		return userID, nil
+	})
+
+	e.POST("/oauth2/token", func(c echo.Context) error {
+		// allow all cors origins
+		c.Response().Header().Set("Access-Control-Allow-Origin", "*")
+		err := srv.HandleTokenRequest(c.Response().Writer, c.Request())
+		if err != nil {
+			svc.Logger.Errorf("Failed to handle token request: %v", err)
+		}
+		return nil
+	})
+
+	e.GET("/oauth2/authback", func(c echo.Context) error {
+		err := srv.HandleAuthorizeRequest(c.Response().Writer, c.Request())
+		if err != nil {
+			svc.Logger.Errorf("Failed to handle authorize request: %v", err)
+		}
+		return nil
+	})
+
+	e.GET("/oauth2/auth", func(c echo.Context) error {
+		rawQuery := c.Request().URL.RawQuery
+		returnPath := "/oauth2/authback?" + rawQuery
+		encodedRedirect := url.QueryEscape(returnPath)
+		redirectPath := "/apps/new?return_to=" + encodedRedirect
+		return c.Redirect(302, redirectPath)
 	})
 }
 
@@ -246,11 +306,32 @@ func getEndOfBudgetString(endOfBudget time.Time) (result string) {
 }
 
 func (svc *Service) AppsNewHandler(c echo.Context) error {
+	user, err := svc.GetUser(c)
+	if err != nil {
+		return err
+	}
 	appName := c.QueryParam("name")
 	if appName == "" {
 		// c - for client (deprecated)
 		appName = c.QueryParam("c")
 	}
+	if user == nil {
+		sess, _ := session.Get(CookieName, c)
+		sess.Values["return_to"] = c.Path() + "?" + c.QueryString()
+		sess.Options.MaxAge = 0
+		sess.Options.SameSite = http.SameSiteLaxMode
+		if svc.cfg.CookieDomain != "" {
+			sess.Options.Domain = svc.cfg.CookieDomain
+		}
+		sess.Save(c.Request(), c.Response())
+		return c.Redirect(302, fmt.Sprintf("/%s/auth?c=%s", strings.ToLower(svc.cfg.LNBackendType), appName))
+	}
+
+	isOAuth := c.QueryParam("client_id") != "" && c.QueryParam("redirect_uri") != "" && c.QueryParam("response_type") == "code"
+	if isOAuth {
+		return svc.appsNewOAuthHandler(c, *user)
+	}
+
 	pubkey := c.QueryParam("pubkey")
 	returnTo := c.QueryParam("return_to")
 	maxAmount := c.QueryParam("max_amount")
@@ -274,22 +355,6 @@ func (svc *Service) AppsNewHandler(c echo.Context) error {
 		requestMethods = strings.Join(keys, " ")
 	}
 	csrf, _ := c.Get(middleware.DefaultCSRFConfig.ContextKey).(string)
-
-	user, err := svc.GetUser(c)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		sess, _ := session.Get(CookieName, c)
-		sess.Values["return_to"] = c.Path() + "?" + c.QueryString()
-		sess.Options.MaxAge = 0
-		sess.Options.SameSite = http.SameSiteLaxMode
-		if svc.cfg.CookieDomain != "" {
-			sess.Options.Domain = svc.cfg.CookieDomain
-		}
-		sess.Save(c.Request(), c.Response())
-		return c.Redirect(302, fmt.Sprintf("/%s/auth?c=%s", strings.ToLower(svc.cfg.LNBackendType), appName))
-	}
 
 	//construction to return a map with all possible permissions
 	//and indicate which ones are checked by default in the front-end
@@ -326,6 +391,72 @@ func (svc *Service) AppsNewHandler(c echo.Context) error {
 		"CustomRequestMethods": customRequestMethods,
 		"RequestMethodHelper":  requestMethodHelper,
 		"Csrf":                 csrf,
+	})
+}
+
+func (svc *Service) appsNewOAuthHandler(c echo.Context, user User) error {
+	clientId := c.QueryParam("client_id")
+	// TODO: Lookup client_id as npub
+	pubkey := c.QueryParam("pubkey")
+	returnTo := c.QueryParam("redirect_uri")
+	maxAmount := c.QueryParam("max_amount")
+	budgetRenewal := strings.ToLower(c.QueryParam("budget_renewal"))
+	expiresAt := c.QueryParam("expires_at") // YYYY-MM-DD or MM/DD/YYYY or timestamp in seconds
+	if expiresAtTimestamp, err := strconv.Atoi(expiresAt); err == nil {
+		expiresAt = time.Unix(int64(expiresAtTimestamp), 0).Format(time.RFC3339)
+	}
+	expiresAtISO, _ := time.Parse(time.RFC3339, expiresAt)
+	expiresAtFormatted := expiresAtISO.Format("January 2, 2006 03:04 PM")
+
+	requestMethods := c.QueryParam("request_methods")
+	customRequestMethods := requestMethods
+	if requestMethods == "" {
+		// if no request methods are given, enable them all by default
+		keys := []string{}
+		for key := range nip47MethodDescriptions {
+			keys = append(keys, key)
+		}
+
+		requestMethods = strings.Join(keys, " ")
+	}
+	csrf, _ := c.Get(middleware.DefaultCSRFConfig.ContextKey).(string)
+
+	//construction to return a map with all possible permissions
+	//and indicate which ones are checked by default in the front-end
+	type RequestMethodHelper struct {
+		Description string
+		Icon        string
+		Checked     bool
+	}
+
+	requestMethodHelper := map[string]*RequestMethodHelper{}
+	for k, v := range nip47MethodDescriptions {
+		requestMethodHelper[k] = &RequestMethodHelper{
+			Description: v,
+			Icon:        nip47MethodIcons[k],
+		}
+	}
+
+	for _, m := range strings.Split(requestMethods, " ") {
+		if _, ok := nip47MethodDescriptions[m]; ok {
+			requestMethodHelper[m].Checked = true
+		}
+	}
+
+	return c.Render(http.StatusOK, "apps/new.html", map[string]interface{}{
+		"User":                 user,
+		"Name":                 clientId,
+		"Pubkey":               pubkey,
+		"ReturnTo":             returnTo,
+		"MaxAmount":            maxAmount,
+		"BudgetRenewal":        budgetRenewal,
+		"ExpiresAt":            expiresAt,
+		"ExpiresAtFormatted":   expiresAtFormatted,
+		"RequestMethods":       requestMethods,
+		"CustomRequestMethods": customRequestMethods,
+		"RequestMethodHelper":  requestMethodHelper,
+		"Csrf":                 csrf,
+		"IsOauth":              true,
 	})
 }
 

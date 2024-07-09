@@ -659,8 +659,28 @@ func createTestService(t *testing.T) (svc *Service, ln *MockLn) {
 type MockLn struct {
 }
 
-func (mln *MockLn) SendPaymentSync(ctx context.Context, senderPubkey string, payReq string) (preimage string, err error) {
+func (mln *MockLn) SendPaymentSync(ctx context.Context, senderPubkey string, payReq string, amount int64) (preimage string, err error) {
 	return "123preimage", nil
+}
+
+func (mln *MockLn) LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mln *MockLn) FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mln *MockLn) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (preimage string, err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (mln *MockLn) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (mln *MockLn) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []nip47.TLVRecord) (preImage string, err error) {

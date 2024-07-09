@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/gorilla/sessions"
 	"github.com/jackc/pgx/v5"
 	_ "github.com/lib/pq"
 	"net/http"
@@ -228,8 +229,10 @@ func main() {
 		svc.lnClient = lightsparkService
 	}
 
+	cookieStore := sessions.NewCookieStore([]byte(svc.cfg.CookieSecret))
 	//register shared routes
-	svc.RegisterSharedRoutes(e)
+	svc.RegisterSharedRoutes(e, cookieStore)
+	svc.RegisterOAuthRoutes(e, cookieStore)
 	//start Echo server
 	wg.Add(1)
 	go func() {
