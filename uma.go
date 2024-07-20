@@ -9,6 +9,8 @@ import (
 	"github.com/getAlby/nostr-wallet-connect/nip47"
 	"github.com/getAlby/nostr-wallet-connect/uma"
 	"github.com/golang-jwt/jwt"
+	"github.com/uma-universal-money-address/uma-auth-api/codegen/go/umaauth"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -101,11 +103,11 @@ func (svc *UmaNwcAdapterService) MakeInvoice(ctx context.Context, senderPubkey s
 	client := svc.oauthConf.Client(ctx, tok)
 
 	body := bytes.NewBuffer([]byte{})
-	payload := &uma.MakeInvoiceRequest{
-		Amount:          amount,
+	payload := &umaauth.MakeInvoiceRequest{
+		Amount:          int32(amount),
 		Description:     description,
 		DescriptionHash: descriptionHash,
-		Expiry:          expiry,
+		Expiry:          int32(expiry),
 	}
 	err = json.NewEncoder(body).Encode(payload)
 
@@ -135,7 +137,7 @@ func (svc *UmaNwcAdapterService) MakeInvoice(ctx context.Context, senderPubkey s
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &uma.UmaBolt11Invoice{}
+		responsePayload := &umaauth.Invoice{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return nil, err
@@ -152,7 +154,7 @@ func (svc *UmaNwcAdapterService) MakeInvoice(ctx context.Context, senderPubkey s
 			"paymentHash":     responsePayload.PaymentHash,
 		}).Info("Make invoice successful")
 
-		transaction := responsePayload.ToNip47Transaction()
+		transaction := uma.InvoiceToNip47Transaction(*responsePayload)
 		return transaction, nil
 	}
 
@@ -217,7 +219,7 @@ func (svc *UmaNwcAdapterService) LookupInvoice(ctx context.Context, senderPubkey
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &uma.UmaBolt11Invoice{}
+		responsePayload := &umaauth.Invoice{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return nil, err
@@ -231,7 +233,7 @@ func (svc *UmaNwcAdapterService) LookupInvoice(ctx context.Context, senderPubkey
 			"settled":        responsePayload.SettledAt != nil,
 		}).Info("Lookup invoice successful")
 
-		transaction = responsePayload.ToNip47Transaction()
+		transaction = uma.InvoiceToNip47Transaction(*responsePayload)
 		return transaction, nil
 	}
 
@@ -318,7 +320,7 @@ func (svc *UmaNwcAdapterService) LookupUser(ctx context.Context, senderPubkey st
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &uma.LookupUserResponse{}
+		responsePayload := &umaauth.LookupUserResponse{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return nil, err
@@ -330,7 +332,7 @@ func (svc *UmaNwcAdapterService) LookupUser(ctx context.Context, senderPubkey st
 			"userId":       app.User.ID,
 		}).Info("Lookup user successful")
 
-		return responsePayload.ToNip47LookupUserResponse(), nil
+		return uma.ToNip47LookupUserResponse(*responsePayload), nil
 	}
 
 	errorPayload := &ErrorResponse{}
@@ -488,8 +490,8 @@ func (svc *UmaNwcAdapterService) PayToAddress(ctx context.Context, senderPubkey 
 	client := svc.oauthConf.Client(ctx, tok)
 
 	body := bytes.NewBuffer([]byte{})
-	payload := &uma.PayToAddressRequest{
-		SendingCurrencyAmount: params.SendingCurrencyAmount,
+	payload := &umaauth.PayToAddressRequest{
+		SendingCurrencyAmount: int32(params.SendingCurrencyAmount),
 		ReceiverAddress:       *params.Receiver.Lud16,
 		ReceivingCurrencyCode: *params.ReceivingCurrencyCode,
 		SendingCurrencyCode:   params.SendingCurrencyCode,
@@ -576,7 +578,7 @@ func (svc *UmaNwcAdapterService) GetBalance(ctx context.Context, senderPubkey st
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &uma.BalanceResponse{}
+		responsePayload := &umaauth.GetBalanceResponse{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return 0, err
@@ -586,14 +588,8 @@ func (svc *UmaNwcAdapterService) GetBalance(ctx context.Context, senderPubkey st
 			"appId":        app.ID,
 			"userId":       app.User.ID,
 		}).Info("Balance fetch successful")
-		// find a balance for btc:
-		for _, asset := range responsePayload.Balances {
-			if asset.Currency == "BTC" {
-				return asset.Balance, nil
-			}
-		}
 
-		return 0, errors.New("no BTC balance found")
+		return int64(math.Floor(float64(responsePayload.Balance))), nil
 	}
 
 	errorPayload := &ErrorResponse{}
@@ -666,7 +662,7 @@ func (svc *UmaNwcAdapterService) ListTransactions(ctx context.Context, senderPub
 		return nil, err
 	}
 
-	var invoices []uma.UmaBolt11Invoice
+	var invoices []umaauth.Invoice
 
 	if resp.StatusCode < 300 {
 		err = json.NewDecoder(resp.Body).Decode(&invoices)
@@ -682,7 +678,7 @@ func (svc *UmaNwcAdapterService) ListTransactions(ctx context.Context, senderPub
 
 		transactions = []nip47.Nip47Transaction{}
 		for _, invoice := range invoices {
-			transaction := invoice.ToNip47Transaction()
+			transaction := uma.InvoiceToNip47Transaction(invoice)
 
 			transactions = append(transactions, *transaction)
 		}
@@ -730,9 +726,10 @@ func (svc *UmaNwcAdapterService) SendPaymentSync(ctx context.Context, senderPubk
 	client := svc.oauthConf.Client(ctx, tok)
 
 	body := bytes.NewBuffer([]byte{})
-	payload := &uma.PayRequest{
+	amount32 := int32(amount)
+	payload := &umaauth.PayInvoiceRequest{
 		Invoice: payReq,
-		Amount:  &amount,
+		Amount:  &amount32,
 	}
 	err = json.NewEncoder(body).Encode(payload)
 
@@ -757,7 +754,7 @@ func (svc *UmaNwcAdapterService) SendPaymentSync(ctx context.Context, senderPubk
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &uma.PayResponse{}
+		responsePayload := &umaauth.PayInvoiceResponse{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return "", err
@@ -767,7 +764,7 @@ func (svc *UmaNwcAdapterService) SendPaymentSync(ctx context.Context, senderPubk
 			"bolt11":       payReq,
 			"appId":        app.ID,
 			"userId":       app.User.ID,
-			"paymentHash":  responsePayload.PaymentHash,
+			"invoice":      payload.Invoice,
 		}).Info("Payment successful")
 		return responsePayload.Preimage, nil
 	}
