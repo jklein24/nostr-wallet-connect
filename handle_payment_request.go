@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/getAlby/nostr-wallet-connect/nip47"
 	"strings"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -11,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (svc *Service) HandlePayInvoiceEvent(ctx context.Context, request *Nip47Request, event *nostr.Event, app App, ss []byte) (result *nostr.Event, err error) {
+func (svc *Service) HandlePayInvoiceEvent(ctx context.Context, request *nip47.Nip47Request, event *nostr.Event, app App, ss []byte) (result *nostr.Event, err error) {
 
 	nostrEvent := NostrEvent{App: app, NostrId: event.ID, Content: event.Content, State: "received"}
 	err = svc.db.Create(&nostrEvent).Error
@@ -25,7 +26,7 @@ func (svc *Service) HandlePayInvoiceEvent(ctx context.Context, request *Nip47Req
 	}
 
 	var bolt11 string
-	payParams := &Nip47PayParams{}
+	payParams := &nip47.Nip47PayParams{}
 	err = json.Unmarshal(request.Params, payParams)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
@@ -48,16 +49,20 @@ func (svc *Service) HandlePayInvoiceEvent(ctx context.Context, request *Nip47Req
 			"bolt11":    bolt11,
 		}).Errorf("Failed to decode bolt11 invoice: %v", err)
 
-		return svc.createResponse(event, Nip47Response{
+		return svc.createResponse(event, nip47.Nip47Response{
 			ResultType: NIP_47_PAY_INVOICE_METHOD,
-			Error: &Nip47Error{
+			Error: &nip47.Nip47Error{
 				Code:    NIP_47_ERROR_INTERNAL,
 				Message: fmt.Sprintf("Failed to decode bolt11 invoice: %s", err.Error()),
 			},
 		}, ss)
 	}
 
-	hasPermission, code, message := svc.hasPermission(&app, event, request.Method, paymentRequest.MSatoshi)
+	amount := paymentRequest.MSatoshi
+	if payParams.Amount != nil {
+		amount = *payParams.Amount
+	}
+	hasPermission, code, message := svc.hasPermission(&app, event, request.Method, amount)
 
 	if !hasPermission {
 		svc.Logger.WithFields(logrus.Fields{
@@ -66,15 +71,15 @@ func (svc *Service) HandlePayInvoiceEvent(ctx context.Context, request *Nip47Req
 			"appId":     app.ID,
 		}).Errorf("App does not have permission: %s %s", code, message)
 
-		return svc.createResponse(event, Nip47Response{
+		return svc.createResponse(event, nip47.Nip47Response{
 			ResultType: NIP_47_PAY_INVOICE_METHOD,
-			Error: &Nip47Error{
+			Error: &nip47.Nip47Error{
 				Code:    code,
 				Message: message,
 			}}, ss)
 	}
 
-	payment := Payment{App: app, NostrEvent: nostrEvent, PaymentRequest: bolt11, Amount: uint(paymentRequest.MSatoshi / 1000)}
+	payment := Payment{App: app, NostrEvent: nostrEvent, PaymentRequest: bolt11, Amount: uint(amount / 1000)}
 	insertPaymentResult := svc.db.Create(&payment)
 	if insertPaymentResult.Error != nil {
 		return nil, insertPaymentResult.Error
@@ -87,7 +92,7 @@ func (svc *Service) HandlePayInvoiceEvent(ctx context.Context, request *Nip47Req
 		"bolt11":    bolt11,
 	}).Info("Sending payment")
 
-	preimage, err := svc.lnClient.SendPaymentSync(ctx, event.PubKey, bolt11)
+	preimage, err := svc.lnClient.SendPaymentSync(ctx, event.PubKey, bolt11, amount)
 	if err != nil {
 		svc.Logger.WithFields(logrus.Fields{
 			"eventId":   event.ID,
@@ -97,9 +102,9 @@ func (svc *Service) HandlePayInvoiceEvent(ctx context.Context, request *Nip47Req
 		}).Infof("Failed to send payment: %v", err)
 		nostrEvent.State = NOSTR_EVENT_STATE_HANDLER_ERROR
 		svc.db.Save(&nostrEvent)
-		return svc.createResponse(event, Nip47Response{
+		return svc.createResponse(event, nip47.Nip47Response{
 			ResultType: NIP_47_PAY_INVOICE_METHOD,
-			Error: &Nip47Error{
+			Error: &nip47.Nip47Error{
 				Code:    NIP_47_ERROR_INTERNAL,
 				Message: fmt.Sprintf("Something went wrong while paying invoice: %s", err.Error()),
 			},
@@ -109,9 +114,9 @@ func (svc *Service) HandlePayInvoiceEvent(ctx context.Context, request *Nip47Req
 	nostrEvent.State = NOSTR_EVENT_STATE_HANDLER_EXECUTED
 	svc.db.Save(&nostrEvent)
 	svc.db.Save(&payment)
-	return svc.createResponse(event, Nip47Response{
+	return svc.createResponse(event, nip47.Nip47Response{
 		ResultType: NIP_47_PAY_INVOICE_METHOD,
-		Result: Nip47PayResponse{
+		Result: nip47.Nip47PayResponse{
 			Preimage: preimage,
 		},
 	}, ss)

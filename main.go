@@ -4,9 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/jackc/pgx/v5"
+	_ "github.com/lib/pq"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,11 +37,37 @@ import (
 func main() {
 
 	// Load config from environment variables / .env file
-	godotenv.Load(".env")
+	envFile := ".env"
+	if os.Getenv("NWC_ENV_FILE") != "" {
+		envFile = os.Getenv("NWC_ENV_FILE")
+	}
+	godotenv.Load(envFile)
 	cfg := &Config{}
 	err := envconfig.Process("", cfg)
 	if err != nil {
 		log.Fatalf("Error loading environment variables: %v", err)
+	}
+	// Load from secrets if available.
+	if _, err := os.Stat(cfg.UmaVaspJwtPubKeySecretFile); err == nil {
+		pubkeyBytes, err := os.ReadFile(cfg.UmaVaspJwtPubKeySecretFile)
+		if err != nil {
+			log.Fatalf("Error reading UMA VASP JWT public key from file: %v", err)
+		}
+		cfg.UmaVaspJwtPubKey = strings.TrimSpace(string(pubkeyBytes))
+	}
+	if _, err := os.Stat(cfg.CookieSecretFile); err == nil {
+		cookieSecretBytes, err := os.ReadFile(cfg.CookieSecretFile)
+		if err != nil {
+			log.Fatalf("Error reading cookie secret from file: %v", err)
+		}
+		cfg.CookieSecret = strings.TrimSpace(string(cookieSecretBytes))
+	}
+	if _, err := os.Stat(cfg.NostrSecretKeyFile); err == nil {
+		nostrPrivKey, err := os.ReadFile(cfg.NostrSecretKeyFile)
+		if err != nil {
+			log.Fatalf("Error reading Nostr private key from file: %v", err)
+		}
+		cfg.NostrSecretKey = strings.TrimSpace(string(nostrPrivKey))
 	}
 
 	var db *gorm.DB
@@ -53,7 +84,36 @@ func main() {
 				log.Fatalf("Failed to open DB %v", err)
 			}
 		} else {
-			db, err = gorm.Open(postgres.Open(cfg.DatabaseUri), &gorm.Config{})
+			if cfg.UseRdsIamAuth {
+				// Strip the port off the endpoint:
+				dbHost := cfg.DatabaseEndpoint
+				dbPort := 5432
+				if strings.Contains(cfg.DatabaseEndpoint, ":") {
+					dbHost = strings.Split(cfg.DatabaseEndpoint, ":")[0]
+					dbPort, err = strconv.Atoi(strings.Split(cfg.DatabaseEndpoint, ":")[1])
+					if err != nil {
+						log.Fatalf("Failed to parse port from endpoint: %v", err)
+					}
+				}
+
+				cfg.DatabaseUri = fmt.Sprintf("host=%s port=%d user=%s dbname=%s sslmode=verify-full sslrootcert=/etc/uma-dogfood/rds-ca.pem",
+					dbHost, dbPort, cfg.DatabaseUser, "nwc",
+				)
+				pgxConfig, err := pgx.ParseConfig(cfg.DatabaseUri)
+				if err != nil {
+					log.Fatalf("Failed to parse config: %v", err)
+				}
+				sqlDb = stdlib.OpenDB(*pgxConfig, stdlib.OptionBeforeConnect(refreshAccessToken(cfg.AwsDatabaseRegion)))
+			} else if cfg.DatabasePassword != "" {
+				cfg.DatabaseUri = fmt.Sprintf("user=%s password=%s dbname=%s host=%s sslmode=disable", cfg.DatabaseUser, cfg.DatabasePassword, "nwc", cfg.DatabaseUri)
+			}
+			var dialector gorm.Dialector
+			if sqlDb != nil {
+				dialector = postgres.New(postgres.Config{Conn: sqlDb})
+			} else {
+				dialector = postgres.Open(cfg.DatabaseUri)
+			}
+			db, err = gorm.Open(dialector, &gorm.Config{})
 			if err != nil {
 				log.Fatalf("Failed to open DB %v", err)
 			}
@@ -109,6 +169,7 @@ func main() {
 		cfg.NostrSecretKey = identity.Privkey
 	}
 
+	log.Println(cfg.NostrSecretKey)
 	identityPubkey, err := nostr.GetPublicKey(cfg.NostrSecretKey)
 	if err != nil {
 		log.Fatalf("Error converting nostr privkey to pubkey: %v", err)
@@ -153,6 +214,18 @@ func main() {
 			svc.Logger.Fatal(err)
 		}
 		svc.lnClient = oauthService
+	case UmaBackendType:
+		umaService, err := NewUmaNwcAdapterService(svc, e)
+		if err != nil {
+			svc.Logger.Fatal(err)
+		}
+		svc.lnClient = umaService
+	case LightsparkBackendType:
+		lightsparkService, err := NewLightsparkService(ctx, svc, e)
+		if err != nil {
+			svc.Logger.Fatal(err)
+		}
+		svc.lnClient = lightsparkService
 	}
 
 	//register shared routes
@@ -212,6 +285,46 @@ func main() {
 		svc.Logger.Error(err)
 	}
 	svc.Logger.Info("Graceful shutdown completed. Goodbye.")
+}
+
+type tokenStruct struct {
+	Token     string
+	ExpiresOn time.Time
+}
+
+func generateAuthToken(ctx context.Context, host string, port uint16, username string, region string) (string, error) {
+	endpoint := fmt.Sprintf("%s:%d", host, port)
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+	if err != nil {
+		return "", err
+	}
+	return auth.BuildAuthToken(ctx, endpoint, region, username, cfg.Credentials)
+}
+
+func refreshAccessToken(region string) func(ctx context.Context, config *pgx.ConnConfig) error {
+
+	accessToken := tokenStruct{}
+
+	return func(ctx context.Context, config *pgx.ConnConfig) error {
+		if accessToken.isExpired() {
+			tokenStr, err := generateAuthToken(ctx, config.Host, config.Port, config.User, region)
+			if err != nil {
+				return fmt.Errorf("failed to get new token: %w", err)
+			}
+			accessToken.Token = tokenStr
+			accessToken.ExpiresOn = time.Now().Add(time.Minute * 15)
+			log.Info("acquired new token for postgres", "expiry", accessToken.ExpiresOn)
+		}
+
+		config.Password = accessToken.Token
+		return nil
+	}
+}
+
+func (t *tokenStruct) isExpired() bool {
+	// expire the token a bit earlier, just to be safe
+	oneMinuteInFuture := time.Now().Add(time.Minute * 1)
+	return t.ExpiresOn.Before(oneMinuteInFuture)
 }
 
 func (svc *Service) createFilters() nostr.Filters {

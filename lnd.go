@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"github.com/getAlby/nostr-wallet-connect/nip47"
 	"sort"
 	"strings"
 	"time"
@@ -22,13 +23,17 @@ import (
 )
 
 type LNClient interface {
-	SendPaymentSync(ctx context.Context, senderPubkey string, payReq string) (preimage string, err error)
-	SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []TLVRecord) (preImage string, err error)
+	SendPaymentSync(ctx context.Context, senderPubkey string, payReq string, amount int64) (preimage string, err error)
+	SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []nip47.TLVRecord) (preImage string, err error)
 	GetBalance(ctx context.Context, senderPubkey string) (balance int64, err error)
 	GetInfo(ctx context.Context, senderPubkey string) (info *NodeInfo, err error)
-	MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *Nip47Transaction, err error)
-	LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *Nip47Transaction, err error)
-	ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []Nip47Transaction, err error)
+	MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error)
+	LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *nip47.Nip47Transaction, err error)
+	ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []nip47.Nip47Transaction, err error)
+	LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error)
+	FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error)
+	ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (response *nip47.Nip47ExecuteQuoteResponse, err error)
+	PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error)
 }
 
 // wrap it again :sweat_smile:
@@ -60,7 +65,7 @@ func (svc *LNDService) GetBalance(ctx context.Context, senderPubkey string) (bal
 	return int64(resp.LocalBalance.Sat), nil
 }
 
-func (svc *LNDService) ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []Nip47Transaction, err error) {
+func (svc *LNDService) ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (transactions []nip47.Nip47Transaction, err error) {
 	// Fetch invoices
 	var invoices []*lnrpc.Invoice
 	if invoiceType == "" || invoiceType == "incoming" {
@@ -121,7 +126,7 @@ func (svc *LNDService) ListTransactions(ctx context.Context, senderPubkey string
 			settledAt = &settledAtUnix
 		}
 
-		transaction := Nip47Transaction{
+		transaction := nip47.Nip47Transaction{
 			Type:            "outgoing",
 			Invoice:         payment.PaymentRequest,
 			Preimage:        payment.PaymentPreimage,
@@ -161,7 +166,23 @@ func (svc *LNDService) GetInfo(ctx context.Context, senderPubkey string) (info *
 	}, nil
 }
 
-func (svc *LNDService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *Nip47Transaction, err error) {
+func (svc *LNDService) LookupUser(ctx context.Context, senderPubkey string, address string) (response *nip47.Nip47LookupUserResponse, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (svc *LNDService) FetchQuote(ctx context.Context, senderPubkey string, params nip47.Nip47FetchQuoteParams) (quote *nip47.Nip47Quote, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (svc *LNDService) ExecuteQuote(ctx context.Context, senderPubkey string, paymentHash string) (response *nip47.Nip47ExecuteQuoteResponse, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (svc *LNDService) PayToAddress(ctx context.Context, senderPubkey string, params nip47.Nip47PayToAddressParams) (response *nip47.Nip47PayToAddressResponse, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (svc *LNDService) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error) {
 	var descriptionHashBytes []byte
 
 	if descriptionHash != "" {
@@ -193,7 +214,7 @@ func (svc *LNDService) MakeInvoice(ctx context.Context, senderPubkey string, amo
 	return transaction, nil
 }
 
-func (svc *LNDService) LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *Nip47Transaction, err error) {
+func (svc *LNDService) LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *nip47.Nip47Transaction, err error) {
 	paymentHashBytes, err := hex.DecodeString(paymentHash)
 
 	if err != nil || len(paymentHashBytes) != 32 {
@@ -212,7 +233,7 @@ func (svc *LNDService) LookupInvoice(ctx context.Context, senderPubkey string, p
 	return transaction, nil
 }
 
-func (svc *LNDService) SendPaymentSync(ctx context.Context, senderPubkey, payReq string) (preimage string, err error) {
+func (svc *LNDService) SendPaymentSync(ctx context.Context, senderPubkey, payReq string, amount int64) (preimage string, err error) {
 	resp, err := svc.client.SendPaymentSync(ctx, &lnrpc.SendRequest{PaymentRequest: payReq})
 	if err != nil {
 		return "", err
@@ -220,7 +241,7 @@ func (svc *LNDService) SendPaymentSync(ctx context.Context, senderPubkey, payReq
 	return hex.EncodeToString(resp.PaymentPreimage), nil
 }
 
-func (svc *LNDService) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []TLVRecord) (respPreimage string, err error) {
+func (svc *LNDService) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []nip47.TLVRecord) (respPreimage string, err error) {
 	destBytes, err := hex.DecodeString(destination)
 	if err != nil {
 		return "", err
@@ -356,7 +377,7 @@ func NewLNDService(ctx context.Context, svc *Service, e *echo.Echo) (result *LND
 	return lndService, nil
 }
 
-func lndInvoiceToTransaction(invoice *lnrpc.Invoice) *Nip47Transaction {
+func lndInvoiceToTransaction(invoice *lnrpc.Invoice) *nip47.Nip47Transaction {
 	var settledAt *int64
 	var preimage string
 	if invoice.State == lnrpc.Invoice_SETTLED {
@@ -370,7 +391,7 @@ func lndInvoiceToTransaction(invoice *lnrpc.Invoice) *Nip47Transaction {
 		expiresAt = &expiresAtUnix
 	}
 
-	return &Nip47Transaction{
+	return &nip47.Nip47Transaction{
 		Type:            "incoming",
 		Invoice:         invoice.PaymentRequest,
 		Description:     invoice.Memo,

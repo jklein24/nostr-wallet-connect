@@ -11,6 +11,7 @@ Connect applications like [Damus](https://damus.io/) or [Amethyst](https://linkt
 
 * [Alby](https://getalby.com) (see: alby.go)
 * LND (see: lnd.go)
+* Lightspark
 * want more? please open an issue.
 
 ## Installation

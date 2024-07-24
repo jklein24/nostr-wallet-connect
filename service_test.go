@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"github.com/getAlby/nostr-wallet-connect/nip47"
 	"os"
 	"testing"
 	"time"
@@ -113,7 +114,7 @@ var mockNodeInfo = NodeInfo{
 var mockTime = time.Unix(1693876963, 0)
 var mockTimeUnix = mockTime.Unix()
 
-var mockTransactions = []Nip47Transaction{
+var mockTransactions = []nip47.Nip47Transaction{
 	{
 		Type:            "incoming",
 		Invoice:         mockInvoice,
@@ -173,7 +174,7 @@ func TestHandleEvent(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
-	received := &Nip47Response{}
+	received := &nip47.Nip47Response{}
 	decrypted, err := nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
 	err = json.Unmarshal([]byte(decrypted), received)
@@ -210,12 +211,12 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47PayResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47PayResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
-	assert.Equal(t, received.Result.(*Nip47PayResponse).Preimage, "123preimage")
+	assert.Equal(t, received.Result.(*nip47.Nip47PayResponse).Preimage, "123preimage")
 	malformedPayload, err := nip04.Encrypt(nip47PayJsonNoInvoice, ss)
 	assert.NoError(t, err)
 	res, err = svc.HandleEvent(ctx, &nostr.Event{
@@ -227,8 +228,8 @@ func TestHandleEvent(t *testing.T) {
 
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	receivedError := &Nip47Response{
-		Result: &Nip47Error{},
+	receivedError := &nip47.Nip47Response{
+		Result: &nip47.Nip47Error{},
 	}
 	err = json.Unmarshal([]byte(decrypted), receivedError)
 	assert.NoError(t, err)
@@ -269,12 +270,12 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47PayResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47PayResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
-	assert.Equal(t, "123preimage", received.Result.(*Nip47PayResponse).Preimage)
+	assert.Equal(t, "123preimage", received.Result.(*nip47.Nip47PayResponse).Preimage)
 	// permissions: budget overflow
 	newMaxAmount := 100
 	err = svc.db.Model(&AppPermission{}).Where("app_id = ?", app.ID).Update("max_amount", newMaxAmount).Error
@@ -290,7 +291,7 @@ func TestHandleEvent(t *testing.T) {
 
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_QUOTA_EXCEEDED, received.Error.Code)
@@ -310,7 +311,7 @@ func TestHandleEvent(t *testing.T) {
 
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_EXPIRED, received.Error.Code)
@@ -332,7 +333,7 @@ func TestHandleEvent(t *testing.T) {
 
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_RESTRICTED, received.Error.Code)
@@ -351,7 +352,7 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_RESTRICTED, received.Error.Code)
@@ -372,12 +373,12 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47PayResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47PayResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
-	assert.Equal(t, "123preimage", received.Result.(*Nip47PayResponse).Preimage)
+	assert.Equal(t, "123preimage", received.Result.(*nip47.Nip47PayResponse).Preimage)
 
 	// keysend: budget overflow
 	newMaxAmount = 100
@@ -393,8 +394,8 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47PayResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47PayResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
@@ -414,7 +415,7 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_RESTRICTED, received.Error.Code)
@@ -439,14 +440,14 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47BalanceResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47BalanceResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(21000), received.Result.(*Nip47BalanceResponse).Balance)
-	assert.Equal(t, 100000, received.Result.(*Nip47BalanceResponse).MaxAmount)
-	assert.Equal(t, "never", received.Result.(*Nip47BalanceResponse).BudgetRenewal)
+	assert.Equal(t, int64(21000), received.Result.(*nip47.Nip47BalanceResponse).Balance)
+	assert.Equal(t, 100000, received.Result.(*nip47.Nip47BalanceResponse).MaxAmount)
+	assert.Equal(t, "never", received.Result.(*nip47.Nip47BalanceResponse).BudgetRenewal)
 
 	// make_invoice: without permission
 	newPayload, err = nip04.Encrypt(nip47MakeInvoiceJson, ss)
@@ -461,7 +462,7 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_RESTRICTED, received.Error.Code)
@@ -479,12 +480,12 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47MakeInvoiceResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47MakeInvoiceResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
-	assert.Equal(t, mockTransaction.Preimage, received.Result.(*Nip47MakeInvoiceResponse).Preimage)
+	assert.Equal(t, mockTransaction.Preimage, received.Result.(*nip47.Nip47MakeInvoiceResponse).Preimage)
 
 	// lookup_invoice: without permission
 	newPayload, err = nip04.Encrypt(nip47LookupInvoiceJson, ss)
@@ -499,7 +500,7 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_RESTRICTED, received.Error.Code)
@@ -518,12 +519,12 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47LookupInvoiceResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47LookupInvoiceResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
-	assert.Equal(t, mockTransaction.Preimage, received.Result.(*Nip47LookupInvoiceResponse).Preimage)
+	assert.Equal(t, mockTransaction.Preimage, received.Result.(*nip47.Nip47LookupInvoiceResponse).Preimage)
 
 	// list_transactions: without permission
 	newPayload, err = nip04.Encrypt(nip47ListTransactionsJson, ss)
@@ -538,7 +539,7 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_RESTRICTED, received.Error.Code)
@@ -557,13 +558,13 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47ListTransactionsResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47ListTransactionsResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(received.Result.(*Nip47ListTransactionsResponse).Transactions))
-	transaction := received.Result.(*Nip47ListTransactionsResponse).Transactions[0]
+	assert.Equal(t, 2, len(received.Result.(*nip47.Nip47ListTransactionsResponse).Transactions))
+	transaction := received.Result.(*nip47.Nip47ListTransactionsResponse).Transactions[0]
 	assert.Equal(t, mockTransactions[0].Type, transaction.Type)
 	assert.Equal(t, mockTransactions[0].Invoice, transaction.Invoice)
 	assert.Equal(t, mockTransactions[0].Description, transaction.Description)
@@ -587,7 +588,7 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{}
+	received = &nip47.Nip47Response{}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
 	assert.Equal(t, NIP_47_ERROR_RESTRICTED, received.Error.Code)
@@ -614,18 +615,18 @@ func TestHandleEvent(t *testing.T) {
 	assert.NotNil(t, res)
 	decrypted, err = nip04.Decrypt(res.Content, ss)
 	assert.NoError(t, err)
-	received = &Nip47Response{
-		Result: &Nip47GetInfoResponse{},
+	received = &nip47.Nip47Response{
+		Result: &nip47.Nip47GetInfoResponse{},
 	}
 	err = json.Unmarshal([]byte(decrypted), received)
 	assert.NoError(t, err)
-	assert.Equal(t, mockNodeInfo.Alias, received.Result.(*Nip47GetInfoResponse).Alias)
-	assert.Equal(t, mockNodeInfo.Color, received.Result.(*Nip47GetInfoResponse).Color)
-	assert.Equal(t, mockNodeInfo.Pubkey, received.Result.(*Nip47GetInfoResponse).Pubkey)
-	assert.Equal(t, mockNodeInfo.Network, received.Result.(*Nip47GetInfoResponse).Network)
-	assert.Equal(t, mockNodeInfo.BlockHeight, received.Result.(*Nip47GetInfoResponse).BlockHeight)
-	assert.Equal(t, mockNodeInfo.BlockHash, received.Result.(*Nip47GetInfoResponse).BlockHash)
-	assert.Equal(t, []string{"get_info"}, received.Result.(*Nip47GetInfoResponse).Methods)
+	assert.Equal(t, mockNodeInfo.Alias, received.Result.(*nip47.Nip47GetInfoResponse).Alias)
+	assert.Equal(t, mockNodeInfo.Color, received.Result.(*nip47.Nip47GetInfoResponse).Color)
+	assert.Equal(t, mockNodeInfo.Pubkey, received.Result.(*nip47.Nip47GetInfoResponse).Pubkey)
+	assert.Equal(t, mockNodeInfo.Network, received.Result.(*nip47.Nip47GetInfoResponse).Network)
+	assert.Equal(t, mockNodeInfo.BlockHeight, received.Result.(*nip47.Nip47GetInfoResponse).BlockHeight)
+	assert.Equal(t, mockNodeInfo.BlockHash, received.Result.(*nip47.Nip47GetInfoResponse).BlockHash)
+	assert.Equal(t, []string{"get_info"}, received.Result.(*nip47.Nip47GetInfoResponse).Methods)
 }
 
 func createTestService(t *testing.T) (svc *Service, ln *MockLn) {
@@ -662,7 +663,7 @@ func (mln *MockLn) SendPaymentSync(ctx context.Context, senderPubkey string, pay
 	return "123preimage", nil
 }
 
-func (mln *MockLn) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []TLVRecord) (preImage string, err error) {
+func (mln *MockLn) SendKeysend(ctx context.Context, senderPubkey string, amount int64, destination, preimage string, custom_records []nip47.TLVRecord) (preImage string, err error) {
 	return "123preimage", nil
 }
 
@@ -674,14 +675,14 @@ func (mln *MockLn) GetInfo(ctx context.Context, senderPubkey string) (info *Node
 	return &mockNodeInfo, nil
 }
 
-func (mln *MockLn) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *Nip47Transaction, err error) {
+func (mln *MockLn) MakeInvoice(ctx context.Context, senderPubkey string, amount int64, description string, descriptionHash string, expiry int64) (transaction *nip47.Nip47Transaction, err error) {
 	return mockTransaction, nil
 }
 
-func (mln *MockLn) LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *Nip47Transaction, err error) {
+func (mln *MockLn) LookupInvoice(ctx context.Context, senderPubkey string, paymentHash string) (transaction *nip47.Nip47Transaction, err error) {
 	return mockTransaction, nil
 }
 
-func (mln *MockLn) ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (invoices []Nip47Transaction, err error) {
+func (mln *MockLn) ListTransactions(ctx context.Context, senderPubkey string, from, until, limit, offset uint64, unpaid bool, invoiceType string) (invoices []nip47.Nip47Transaction, err error) {
 	return mockTransactions, nil
 }

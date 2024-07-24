@@ -1,16 +1,25 @@
 module github.com/getAlby/nostr-wallet-connect
 
-go 1.20
+go 1.21
+
+toolchain go1.21.3
 
 require (
+	github.com/aws/aws-sdk-go-v2/config v1.27.24
+	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.4.13
+	github.com/aws/aws-sdk-go-v2/service/rds v1.81.2
 	github.com/davrux/echo-logrus/v4 v4.0.3
 	github.com/go-gormigrate/gormigrate/v2 v2.1.1
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/sessions v1.2.1
 	github.com/labstack/echo-contrib v0.14.1
 	github.com/labstack/echo/v4 v4.10.2
+	github.com/lib/pq v1.10.7
+	github.com/lightsparkdev/go-sdk v0.13.0
 	github.com/nbd-wtf/go-nostr v0.25.5
 	github.com/nbd-wtf/ln-decodepay v1.11.1
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
+	github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240720081114-4c7d05321a12
 	golang.org/x/oauth2 v0.4.0
 	google.golang.org/grpc v1.53.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.47.0
@@ -26,14 +35,27 @@ require (
 	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
 	github.com/DataDog/go-tuf v0.3.0--fix-localmeta-fork // indirect
 	github.com/DataDog/sketches-go v1.2.1 // indirect
+	github.com/DataDog/zstd v1.5.5 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/aead/siphash v1.0.1 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.30.1 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.24 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.9 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.13 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.13 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.15 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.22.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.30.1 // indirect
+	github.com/aws/smithy-go v1.20.3 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/btcsuite/btcd v0.23.4 // indirect
-	github.com/btcsuite/btcd/btcutil v1.1.3 // indirect
-	github.com/btcsuite/btcd/btcutil/psbt v1.1.6 // indirect
+	github.com/btcsuite/btcd v0.24.0 // indirect
+	github.com/btcsuite/btcd/btcutil v1.1.5 // indirect
+	github.com/btcsuite/btcd/btcutil/psbt v1.1.9 // indirect
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
 	github.com/btcsuite/btcwallet v0.16.5 // indirect
 	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.3 // indirect
@@ -64,7 +86,6 @@ require (
 	github.com/gobwas/ws v1.2.0 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.3 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
@@ -72,6 +93,7 @@ require (
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
@@ -88,13 +110,13 @@ require (
 	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.3.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jrick/logrotate v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
-	github.com/lib/pq v1.10.7 // indirect
 	github.com/lightninglabs/gozmq v0.0.0-20191113021534-d20a764486bf // indirect
 	github.com/lightninglabs/neutrino v0.14.2 // indirect
 	github.com/lightningnetwork/lightning-onion v1.2.0 // indirect
@@ -105,6 +127,7 @@ require (
 	github.com/lightningnetwork/lnd/ticker v1.1.0 // indirect
 	github.com/lightningnetwork/lnd/tlv v1.1.0 // indirect
 	github.com/lightningnetwork/lnd/tor v1.1.0 // indirect
+	github.com/lightsparkdev/lightspark-crypto-uniffi/lightspark-crypto-go v0.4.1 // indirect
 	github.com/ltcsuite/ltcd v0.22.1-beta // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -160,12 +183,12 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
-	golang.org/x/crypto v0.9.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
@@ -186,9 +209,8 @@ require (
 )
 
 require (
-	github.com/SaveTheRbtz/generic-sync-map-go v0.0.0-20220414055132-a37292614db8 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.0.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/glebarez/sqlite v1.5.0
@@ -199,7 +221,6 @@ require (
 	github.com/lightningnetwork/lnd v0.15.5-beta.rc2
 	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/sirupsen/logrus v1.9.0
-	github.com/valyala/fastjson v1.6.3 // indirect
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 // indirect
 	gorm.io/driver/postgres v1.5.2
 )

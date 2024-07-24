@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"github.com/getAlby/nostr-wallet-connect/nip47"
 	"time"
 
 	"gorm.io/gorm"
@@ -18,6 +18,10 @@ const (
 	NIP_47_LOOKUP_INVOICE_METHOD      = "lookup_invoice"
 	NIP_47_LIST_TRANSACTIONS_METHOD   = "list_transactions"
 	NIP_47_PAY_KEYSEND_METHOD         = "pay_keysend"
+	NIP_47_LOOKUP_USER_METHOD         = "lookup_user"
+	NIP_47_FETCH_QUOTE_METHOD         = "fetch_quote"
+	NIP_47_EXECUTE_QUOTE_METHOD       = "execute_quote"
+	NIP_47_PAY_TO_ADDRESS_METHOD      = "pay_to_address"
 	NIP_47_ERROR_INTERNAL             = "INTERNAL"
 	NIP_47_ERROR_NOT_IMPLEMENTED      = "NOT_IMPLEMENTED"
 	NIP_47_ERROR_QUOTA_EXCEEDED       = "QUOTA_EXCEEDED"
@@ -26,7 +30,7 @@ const (
 	NIP_47_ERROR_EXPIRED              = "EXPIRED"
 	NIP_47_ERROR_RESTRICTED           = "RESTRICTED"
 	NIP_47_OTHER                      = "OTHER"
-	NIP_47_CAPABILITIES               = "pay_invoice pay_keysend get_balance get_info make_invoice lookup_invoice list_transactions"
+	NIP_47_CAPABILITIES               = "pay_invoice pay_keysend get_balance get_info make_invoice lookup_invoice list_transactions lookup_user fetch_quote execute_quote pay_to_address"
 )
 
 const (
@@ -44,6 +48,10 @@ var nip47MethodDescriptions = map[string]string{
 	NIP_47_MAKE_INVOICE_METHOD:      "Create invoices",
 	NIP_47_LOOKUP_INVOICE_METHOD:    "Lookup status of invoices",
 	NIP_47_LIST_TRANSACTIONS_METHOD: "Read incoming transaction history",
+	NIP_47_LOOKUP_USER_METHOD:       "Lookup user info and currency preferences",
+	NIP_47_FETCH_QUOTE_METHOD:       "Get a quote for a cross-currency payment",
+	NIP_47_EXECUTE_QUOTE_METHOD:     "Execute a cross-currency payment",
+	NIP_47_PAY_TO_ADDRESS_METHOD:    "Send payments to a specific receiver address",
 }
 
 var nip47MethodIcons = map[string]string{
@@ -53,6 +61,10 @@ var nip47MethodIcons = map[string]string{
 	NIP_47_MAKE_INVOICE_METHOD:      "invoice",
 	NIP_47_LOOKUP_INVOICE_METHOD:    "search",
 	NIP_47_LIST_TRANSACTIONS_METHOD: "transactions",
+	NIP_47_LOOKUP_USER_METHOD:       "search",
+	NIP_47_FETCH_QUOTE_METHOD:       "wallet",
+	NIP_47_EXECUTE_QUOTE_METHOD:     "transactions",
+	NIP_47_PAY_TO_ADDRESS_METHOD:    "lightning",
 }
 
 // TODO: move to models/Alby
@@ -125,22 +137,6 @@ type Payment struct {
 	UpdatedAt      time.Time
 }
 
-// TODO: move to models/Nip47
-type Nip47Transaction struct {
-	Type            string      `json:"type"`
-	Invoice         string      `json:"invoice"`
-	Description     string      `json:"description"`
-	DescriptionHash string      `json:"description_hash"`
-	Preimage        string      `json:"preimage"`
-	PaymentHash     string      `json:"payment_hash"`
-	Amount          int64       `json:"amount"`
-	FeesPaid        int64       `json:"fees_paid"`
-	CreatedAt       int64       `json:"created_at"`
-	ExpiresAt       *int64      `json:"expires_at"`
-	SettledAt       *int64      `json:"settled_at"`
-	Metadata        interface{} `json:"metadata,omitempty"`
-}
-
 // TODO: move to models/Alby
 type AlbyInvoice struct {
 	Amount int64 `json:"amount"`
@@ -199,11 +195,11 @@ type MakeInvoiceRequest struct {
 }
 
 type MakeInvoiceResponse struct {
-	Nip47Transaction
+	nip47.Nip47Transaction
 }
 
 type LookupInvoiceResponse struct {
-	Nip47Transaction
+	nip47.Nip47Transaction
 }
 
 type ErrorResponse struct {
@@ -225,89 +221,4 @@ type NodeInfo struct {
 type Identity struct {
 	gorm.Model
 	Privkey string
-}
-
-// TODO: move to models/Nip47
-type Nip47Request struct {
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params"`
-}
-
-type Nip47Response struct {
-	Error      *Nip47Error `json:"error,omitempty"`
-	Result     interface{} `json:"result,omitempty"`
-	ResultType string      `json:"result_type"`
-}
-
-type Nip47Error struct {
-	Code    string `json:"code,omitempty"`
-	Message string `json:"message,omitempty"`
-}
-
-type Nip47PayParams struct {
-	Invoice string `json:"invoice"`
-}
-type Nip47PayResponse struct {
-	Preimage string `json:"preimage"`
-}
-
-type Nip47KeysendParams struct {
-	Amount     int64       `json:"amount"`
-	Pubkey     string      `json:"pubkey"`
-	Preimage   string      `json:"preimage"`
-	TLVRecords []TLVRecord `json:"tlv_records"`
-}
-
-type TLVRecord struct {
-	Type  uint64 `json:"type"`
-	Value string `json:"value"`
-}
-
-type Nip47BalanceResponse struct {
-	Balance       int64  `json:"balance"`
-	MaxAmount     int    `json:"max_amount"`
-	BudgetRenewal string `json:"budget_renewal"`
-}
-
-// TODO: move to models/Nip47
-type Nip47GetInfoResponse struct {
-	Alias       string   `json:"alias"`
-	Color       string   `json:"color"`
-	Pubkey      string   `json:"pubkey"`
-	Network     string   `json:"network"`
-	BlockHeight uint32   `json:"block_height"`
-	BlockHash   string   `json:"block_hash"`
-	Methods     []string `json:"methods"`
-}
-
-type Nip47MakeInvoiceParams struct {
-	Amount          int64  `json:"amount"`
-	Description     string `json:"description"`
-	DescriptionHash string `json:"description_hash"`
-	Expiry          int64  `json:"expiry"`
-}
-type Nip47MakeInvoiceResponse struct {
-	Nip47Transaction
-}
-
-type Nip47LookupInvoiceParams struct {
-	Invoice     string `json:"invoice"`
-	PaymentHash string `json:"payment_hash"`
-}
-
-type Nip47LookupInvoiceResponse struct {
-	Nip47Transaction
-}
-
-type Nip47ListTransactionsParams struct {
-	From   uint64 `json:"from,omitempty"`
-	Until  uint64 `json:"until,omitempty"`
-	Limit  uint64 `json:"limit,omitempty"`
-	Offset uint64 `json:"offset,omitempty"`
-	Unpaid bool   `json:"unpaid,omitempty"`
-	Type   string `json:"type,omitempty"`
-}
-
-type Nip47ListTransactionsResponse struct {
-	Transactions []Nip47Transaction `json:"transactions"`
 }
