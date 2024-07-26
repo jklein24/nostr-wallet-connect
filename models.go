@@ -89,14 +89,16 @@ type User struct {
 }
 
 type App struct {
-	ID          uint
-	UserId      uint `validate:"required"`
-	User        User
-	Name        string `validate:"required"`
-	Description string
-	NostrPubkey string `validate:"required"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             uint
+	UserId         uint `validate:"required"`
+	User           User
+	Name           string `validate:"required"`
+	Description    string
+	NostrPubkey    string `validate:"required"`
+	NostrSecretKey string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	AuthCode       string
 }
 
 type AppPermission struct {

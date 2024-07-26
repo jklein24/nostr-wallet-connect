@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/manage"
 	"github.com/go-oauth2/oauth2/v4/server"
 	"html/template"
@@ -98,15 +99,16 @@ func (svc *Service) RegisterSharedRoutes(e *echo.Echo, cookieStore *sessions.Coo
 func (svc *Service) RegisterOAuthRoutes(e *echo.Echo, cookieStore *sessions.CookieStore) {
 	manager := manage.NewDefaultManager()
 	manager.SetAuthorizeCodeTokenCfg(manage.DefaultAuthorizeCodeTokenCfg)
+	manager.MapAccessGenerate(NewAccessTokenGenerator(svc.db))
+	manager.MapAuthorizeGenerate(NewAuthCodeGenerator(svc.db))
 	tokenStore := oauth2gorm.NewTokenStoreWithDB(&oauth2gorm.Config{}, svc.db, 0)
 	manager.MapTokenStorage(tokenStore)
 	clientStore := NostrClientStore{}
 	manager.MapClientStorage(clientStore)
 
-	//manager.MapAccessGenerate()
-
 	srv := server.NewServer(server.NewConfig(), manager)
 	srv.SetClientInfoHandler(server.ClientFormHandler)
+	srv.SetExtensionFieldsHandler(svc.accessTokenExtensionData)
 
 	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
 		sess, err := cookieStore.Get(r, CookieName)
@@ -147,6 +149,41 @@ func (svc *Service) RegisterOAuthRoutes(e *echo.Echo, cookieStore *sessions.Cook
 		redirectPath := "/apps/new?return_to=" + encodedRedirect
 		return c.Redirect(302, redirectPath)
 	})
+}
+
+func (svc *Service) accessTokenExtensionData(tokenInfo oauth2.TokenInfo) (fieldsValue map[string]interface{}) {
+	access := tokenInfo.GetAccess()
+	if access == "" {
+		return map[string]interface{}{}
+	}
+	app := App{}
+	svc.db.Where("nostr_secret_key = ?", access).First(&app)
+	if app.ID == 0 {
+		return map[string]interface{}{}
+	}
+	var lud16 string
+	// TODO: preload the user so this is populated.
+	if app.User.LightningAddress != "" {
+		lud16 = fmt.Sprintf("&lud16=%s", app.User.LightningAddress)
+	}
+	publicRelayUrl := svc.cfg.PublicRelay
+	if publicRelayUrl == "" {
+		publicRelayUrl = svc.cfg.Relay
+	}
+
+	var permissions []string
+	svc.db.Model(&AppPermission{}).Where("app_id = ?", app.ID).Pluck("request_method", &permissions)
+	var firstPermission AppPermission
+	svc.db.Model(&AppPermission{}).Where("app_id = ?", app.ID).First(&firstPermission)
+	var budgetString string
+	budgetString = fmt.Sprintf("%d/%s", firstPermission.MaxAmount, firstPermission.BudgetRenewal)
+	pairingUri := template.URL(fmt.Sprintf("nostr+walletconnect://%s?relay=%s&secret=%s%s", svc.cfg.IdentityPubkey, publicRelayUrl, app.NostrSecretKey, lud16))
+	return map[string]interface{}{
+		"nwc_connection_uri": pairingUri,
+		"commands":           permissions,
+		"budget":             budgetString,
+		"nwc_expires_at":     firstPermission.ExpiresAt.Unix(),
+	}
 }
 
 func (svc *Service) IndexHandler(c echo.Context) error {
@@ -484,7 +521,7 @@ func (svc *Service) AppsCreateHandler(c echo.Context) error {
 			return c.Redirect(302, "/apps")
 		}
 	}
-	app := App{Name: name, NostrPubkey: pairingPublicKey}
+	app := App{Name: name, NostrPubkey: pairingPublicKey, NostrSecretKey: pairingSecretKey}
 	maxAmount, _ := strconv.Atoi(c.FormValue("MaxAmount"))
 	budgetRenewal := c.FormValue("BudgetRenewal")
 
@@ -555,6 +592,11 @@ func (svc *Service) AppsCreateHandler(c echo.Context) error {
 			query.Add("pubkey", svc.cfg.IdentityPubkey)
 			if user.LightningAddress != "" {
 				query.Add("lud16", user.LightningAddress)
+			}
+			// This is a gross hack to get the oauth2 flow to work. It's not how a real implementation should work, but
+			// I don't want to refactor the whole world here to make it cleaner.
+			if returnToUrl.Host == "" && returnToUrl.Path == "/oauth2/authback" {
+				query.Add("app_id", fmt.Sprintf("%d", app.ID))
 			}
 			returnToUrl.RawQuery = query.Encode()
 			return c.Redirect(302, returnToUrl.String())
