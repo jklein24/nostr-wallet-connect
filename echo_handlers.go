@@ -71,7 +71,7 @@ func (svc *Service) RegisterSharedRoutes(e *echo.Echo, cookieStore *sessions.Coo
 	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 		TokenLookup: "form:_csrf",
 		Skipper: func(c echo.Context) bool {
-			return c.Request().URL.Path == "/oauth2/token"
+			return c.Request().URL.Path == "/oauth/token"
 		},
 	}))
 	e.Use(session.Middleware(cookieStore))
@@ -124,7 +124,13 @@ func (svc *Service) RegisterOAuthRoutes(e *echo.Echo, cookieStore *sessions.Cook
 		return userID, nil
 	})
 
-	e.POST("/oauth2/token", func(c echo.Context) error {
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		Skipper: func(c echo.Context) bool {
+			return c.Request().URL.Path != "/oauth/token"
+		},
+	}))
+	e.POST("/oauth/token", func(c echo.Context) error {
 		// allow all cors origins
 		c.Response().Header().Set("Access-Control-Allow-Origin", "*")
 		err := srv.HandleTokenRequest(c.Response().Writer, c.Request())
@@ -134,7 +140,7 @@ func (svc *Service) RegisterOAuthRoutes(e *echo.Echo, cookieStore *sessions.Cook
 		return nil
 	})
 
-	e.GET("/oauth2/authback", func(c echo.Context) error {
+	e.GET("/oauth/authback", func(c echo.Context) error {
 		err := srv.HandleAuthorizeRequest(c.Response().Writer, c.Request())
 		if err != nil {
 			svc.Logger.Errorf("Failed to handle authorize request: %v", err)
@@ -142,9 +148,9 @@ func (svc *Service) RegisterOAuthRoutes(e *echo.Echo, cookieStore *sessions.Cook
 		return nil
 	})
 
-	e.GET("/oauth2/auth", func(c echo.Context) error {
+	e.GET("/oauth/auth", func(c echo.Context) error {
 		rawQuery := c.Request().URL.RawQuery
-		returnPath := "/oauth2/authback?" + rawQuery
+		returnPath := "/oauth/authback?" + rawQuery
 		encodedRedirect := url.QueryEscape(returnPath)
 		redirectPath := "/apps/new?return_to=" + encodedRedirect
 		return c.Redirect(302, redirectPath)
@@ -595,7 +601,7 @@ func (svc *Service) AppsCreateHandler(c echo.Context) error {
 			}
 			// This is a gross hack to get the oauth2 flow to work. It's not how a real implementation should work, but
 			// I don't want to refactor the whole world here to make it cleaner.
-			if returnToUrl.Host == "" && returnToUrl.Path == "/oauth2/authback" {
+			if returnToUrl.Host == "" && returnToUrl.Path == "/oauth/authback" {
 				query.Add("app_id", fmt.Sprintf("%d", app.ID))
 			}
 			returnToUrl.RawQuery = query.Encode()
