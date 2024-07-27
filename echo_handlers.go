@@ -152,7 +152,7 @@ func (svc *Service) RegisterOAuthRoutes(e *echo.Echo, cookieStore *sessions.Cook
 		rawQuery := c.Request().URL.RawQuery
 		returnPath := "/oauth/authback?" + rawQuery
 		encodedRedirect := url.QueryEscape(returnPath)
-		redirectPath := "/apps/new?return_to=" + encodedRedirect
+		redirectPath := "/apps/new?return_to=" + encodedRedirect + "&client_id=" + c.QueryParam("client_id") + "&redirect_uri=" + c.QueryParam("redirect_uri") + "&response_type=" + c.QueryParam("response_type")
 		return c.Redirect(302, redirectPath)
 	})
 }
@@ -439,9 +439,15 @@ func (svc *Service) AppsNewHandler(c echo.Context) error {
 
 func (svc *Service) appsNewOAuthHandler(c echo.Context, user User) error {
 	clientId := c.QueryParam("client_id")
+	nostrStore := NostrClientStore{}
+	client, err := nostrStore.GetByID(c.Request().Context(), clientId)
+	if err != nil {
+		return err
+	}
+	nostrClientInfo := client.(*NostrClientInfo)
 	// TODO: Lookup client_id as npub
 	pubkey := c.QueryParam("pubkey")
-	returnTo := c.QueryParam("redirect_uri")
+	returnTo := c.QueryParam("return_to")
 	maxAmount := c.QueryParam("max_amount")
 	budgetRenewal := strings.ToLower(c.QueryParam("budget_renewal"))
 	expiresAt := c.QueryParam("expires_at") // YYYY-MM-DD or MM/DD/YYYY or timestamp in seconds
@@ -488,7 +494,8 @@ func (svc *Service) appsNewOAuthHandler(c echo.Context, user User) error {
 
 	return c.Render(http.StatusOK, "apps/new.html", map[string]interface{}{
 		"User":                 user,
-		"Name":                 clientId,
+		"Name":                 *nostrClientInfo.DisplayName,
+		"Logo":                 *nostrClientInfo.ImageUrl,
 		"Pubkey":               pubkey,
 		"ReturnTo":             returnTo,
 		"MaxAmount":            maxAmount,

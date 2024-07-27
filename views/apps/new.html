@@ -1,12 +1,17 @@
 {{define "body"}}
 
-<h2 class="font-bold text-2xl font-headline mb-4 dark:text-white">
-  {{if .Name}}
-    Connect to {{.Name}}
-  {{else}}
-    Connect a new app
+<div class="flex mb-4 items-center gap-2">
+  <h2 class="font-bold text-2xl font-headline dark:text-white inline">
+    {{if .Name}}
+      Connect to {{.Name}}
+    {{else}}
+      Connect a new app
+    {{end}}
+  </h2>
+  {{if .Logo}}
+      <img class="w-8 h-8 rounded-lg inline" src="{{.Logo}}" alt="{{.Name}}">
   {{end}}
-</h2>
+</div>
 
 <form method="POST" action="/apps" accept-charset="UTF-8">
   <div class="bg-white dark:bg-surface-02dp rounded-md shadow p-4 md:p-8 ">
