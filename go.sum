@@ -942,6 +942,8 @@ github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-2024072007
 github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240720070220-16b733f0c999/go.mod h1:ZQ/o211Jn/38BKASbtCmMVqSvFOFE5WbTQQglNaKrGI=
 github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240720081114-4c7d05321a12 h1:qKD0fBQt3cVMOmujawV0yqQ1VBCq4Y/cNAQkxDH0Yh8=
 github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240720081114-4c7d05321a12/go.mod h1:ZQ/o211Jn/38BKASbtCmMVqSvFOFE5WbTQQglNaKrGI=
+github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240728182558-9fe7d912627f h1:GyWa7WuALDi/VStNWmESlUB8oijBvT/MGu2rygsRngI=
+github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240728182558-9fe7d912627f/go.mod h1:ZQ/o211Jn/38BKASbtCmMVqSvFOFE5WbTQQglNaKrGI=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.14.0/go.mod h1:ol1PCaL0dX20wC0htZ7sYCsvCYmrouYra0zHzaclZhE=

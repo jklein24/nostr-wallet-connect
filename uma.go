@@ -104,7 +104,7 @@ func (svc *UmaNwcAdapterService) MakeInvoice(ctx context.Context, senderPubkey s
 
 	body := bytes.NewBuffer([]byte{})
 	payload := &umaauth.MakeInvoiceRequest{
-		Amount:          int32(amount),
+		Amount:          amount,
 		Description:     description,
 		DescriptionHash: descriptionHash,
 		Expiry:          int32(expiry),
@@ -495,7 +495,7 @@ func (svc *UmaNwcAdapterService) PayToAddress(ctx context.Context, senderPubkey 
 
 	body := bytes.NewBuffer([]byte{})
 	payload := &umaauth.PayToAddressRequest{
-		SendingCurrencyAmount: int32(params.SendingCurrencyAmount),
+		SendingCurrencyAmount: params.SendingCurrencyAmount,
 		ReceiverAddress:       *params.Receiver.Lud16,
 		ReceivingCurrencyCode: receivingCurrency,
 		SendingCurrencyCode:   params.SendingCurrencyCode,
@@ -730,10 +730,9 @@ func (svc *UmaNwcAdapterService) SendPaymentSync(ctx context.Context, senderPubk
 	client := svc.oauthConf.Client(ctx, tok)
 
 	body := bytes.NewBuffer([]byte{})
-	amount32 := int32(amount)
 	payload := &umaauth.PayInvoiceRequest{
 		Invoice: payReq,
-		Amount:  &amount32,
+		Amount:  &amount,
 	}
 	err = json.NewEncoder(body).Encode(payload)
 
