@@ -163,12 +163,11 @@ func (svc *Service) accessTokenExtensionData(tokenInfo oauth2.TokenInfo) (fields
 		return map[string]interface{}{}
 	}
 	app := App{}
-	svc.db.Where("nostr_secret_key = ?", access).First(&app)
+	svc.db.Preload("User").First(&app, &App{NostrSecretKey: access})
 	if app.ID == 0 {
 		return map[string]interface{}{}
 	}
 	var lud16 string
-	// TODO: preload the user so this is populated.
 	if app.User.LightningAddress != "" {
 		lud16 = fmt.Sprintf("&lud16=%s", app.User.LightningAddress)
 	}

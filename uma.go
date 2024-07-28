@@ -488,12 +488,16 @@ func (svc *UmaNwcAdapterService) PayToAddress(ctx context.Context, senderPubkey 
 		return nil, err
 	}
 	client := svc.oauthConf.Client(ctx, tok)
+	receivingCurrency := ""
+	if params.ReceivingCurrencyCode != nil {
+		receivingCurrency = *params.ReceivingCurrencyCode
+	}
 
 	body := bytes.NewBuffer([]byte{})
 	payload := &umaauth.PayToAddressRequest{
 		SendingCurrencyAmount: int32(params.SendingCurrencyAmount),
 		ReceiverAddress:       *params.Receiver.Lud16,
-		ReceivingCurrencyCode: *params.ReceivingCurrencyCode,
+		ReceivingCurrencyCode: receivingCurrency,
 		SendingCurrencyCode:   params.SendingCurrencyCode,
 	}
 	err = json.NewEncoder(body).Encode(payload)

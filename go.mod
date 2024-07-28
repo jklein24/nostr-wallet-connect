@@ -11,6 +11,7 @@ require (
 	github.com/go-gormigrate/gormigrate/v2 v2.1.1
 	github.com/go-oauth2/oauth2/v4 v4.2.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/sessions v1.2.1
 	github.com/labstack/echo-contrib v0.14.1
 	github.com/labstack/echo/v4 v4.10.2
@@ -24,7 +25,7 @@ require (
 	google.golang.org/grpc v1.53.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.47.0
 	gopkg.in/macaroon.v2 v2.1.0
-	gorm.io/gorm v1.25.7
+	gorm.io/gorm v1.25.11
 	src.techknowlogick.com/oauth2-gorm v0.0.0-20220601194631-b3be20d6b196
 )
 
@@ -96,7 +97,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect

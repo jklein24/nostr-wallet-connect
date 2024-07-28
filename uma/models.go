@@ -18,12 +18,22 @@ func InvoiceToNip47Transaction(i umaauth.Invoice) *nip47.Nip47Transaction {
 		*settledAt = i.SettledAt.Unix()
 	}
 
+	preimage := ""
+	if i.Preimage != nil {
+		preimage = *i.Preimage
+	}
+
+	memo := ""
+	if i.Memo != nil {
+		memo = *i.Memo
+	}
+
 	return &nip47.Nip47Transaction{
 		Type:            i.Type,
 		Invoice:         i.PaymentRequest,
-		Description:     *i.Memo,
+		Description:     memo,
 		DescriptionHash: "",
-		Preimage:        *i.Preimage,
+		Preimage:        preimage,
 		PaymentHash:     i.PaymentHash,
 		Amount:          int64(i.Amount),
 		FeesPaid:        0, // TODO: support fees

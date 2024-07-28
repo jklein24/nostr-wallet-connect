@@ -11,7 +11,7 @@ var _202407241504_add_oauth_codes = &gormigrate.Migration{
 	Migrate: func(tx *gorm.DB) error {
 		var sql string
 		if tx.Dialector.Name() == "postgres" {
-			sql = "ALTER TABLE apps ADD COLUMN auth_code TEXT, ADD COLUMN nostr_secret_key TEXT"
+			sql = "ALTER TABLE apps ADD COLUMN IF NOT EXISTS auth_code TEXT, ADD COLUMN IF NOT EXISTS nostr_secret_key TEXT"
 		} else if tx.Dialector.Name() == "sqlite" {
 			// In sqlite dialect:
 			sql = "ALTER TABLE `apps` ADD COLUMN `auth_code` TEXT; ALTER TABLE `apps` ADD COLUMN `nostr_secret_key` TEXT"
