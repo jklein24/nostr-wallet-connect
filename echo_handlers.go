@@ -444,7 +444,6 @@ func (svc *Service) appsNewOAuthHandler(c echo.Context, user User) error {
 		return err
 	}
 	nostrClientInfo := client.(*NostrClientInfo)
-	// TODO: Lookup client_id as npub
 	pubkey := c.QueryParam("pubkey")
 	returnTo := c.QueryParam("return_to")
 	maxAmount := c.QueryParam("max_amount")
@@ -491,6 +490,7 @@ func (svc *Service) appsNewOAuthHandler(c echo.Context, user User) error {
 		}
 	}
 
+	// TODO: Use the nip05 domain and verification status.
 	return c.Render(http.StatusOK, "apps/new.html", map[string]interface{}{
 		"User":                 user,
 		"Name":                 *nostrClientInfo.DisplayName,

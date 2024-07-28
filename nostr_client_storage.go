@@ -6,8 +6,16 @@ import (
 	"errors"
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip05"
 	"github.com/nbd-wtf/go-nostr/nip19"
+	log "github.com/sirupsen/logrus"
 	"strings"
+)
+
+const (
+	NIP_05_VERIFICATION_STATE_NONE     = "none"
+	NIP_05_VERIFICATION_STATE_VERIFIED = "verified"
+	NIP_05_VERIFICATION_STATE_INVALID  = "invalid"
 )
 
 type NostrClientStore struct {
@@ -73,25 +81,39 @@ func (cs NostrClientStore) GetByID(ctx context.Context, id string) (oauth2.Clien
 	}
 
 	imageUrl := profile["picture"].(string)
-	nip05 := profile["nip05"].(string)
+	nip05Address := profile["nip05"].(string)
 	var domain *string
-	if nip05 != "" {
-		if strings.Contains(nip05, "@") {
-			domain = &strings.Split(nip05, "@")[1]
+	if nip05Address != "" {
+		if strings.Contains(nip05Address, "@") {
+			domain = &strings.Split(nip05Address, "@")[1]
 		} else {
-			domain = &nip05
+			domain = &nip05Address
 		}
 	}
 	displayName := profile["display_name"].(string)
-	// TODO: Verify the nip05 domain
+	nip05res, err := nip05.QueryIdentifier(ctx, nip05.NormalizeIdentifier(nip05Address))
+	if err != nil {
+		log.Errorf("Failed to query nip05: %v", err)
+		return nil, err
+	}
+	nip05VerificationState := NIP_05_VERIFICATION_STATE_NONE
+	if nip05res != nil {
+		if nip05res.PublicKey == hexPubKey {
+			nip05VerificationState = NIP_05_VERIFICATION_STATE_VERIFIED
+		} else {
+			nip05VerificationState = NIP_05_VERIFICATION_STATE_INVALID
+		}
+	}
+	log.Infof("NIP05 verification state: %s", nip05VerificationState)
 
 	return &NostrClientInfo{
-		Npub:        hexPubKey,
-		Relay:       relayUrl,
-		Name:        profile["name"].(string),
-		ImageUrl:    &imageUrl,
-		Nip05Domain: domain,
-		DisplayName: &displayName,
+		Npub:                   hexPubKey,
+		Relay:                  relayUrl,
+		Name:                   profile["name"].(string),
+		ImageUrl:               &imageUrl,
+		Nip05Domain:            domain,
+		Nip05VerificationState: nip05VerificationState,
+		DisplayName:            &displayName,
 	}, nil
 }
 
@@ -101,12 +123,13 @@ func (cs NostrClientStore) Set(id string, cli oauth2.ClientInfo) (err error) {
 }
 
 type NostrClientInfo struct {
-	Npub        string
-	Relay       string
-	Name        string
-	ImageUrl    *string
-	Nip05Domain *string
-	DisplayName *string
+	Npub                   string
+	Relay                  string
+	Name                   string
+	ImageUrl               *string
+	Nip05Domain            *string
+	Nip05VerificationState string
+	DisplayName            *string
 }
 
 func (ci *NostrClientInfo) GetID() string {

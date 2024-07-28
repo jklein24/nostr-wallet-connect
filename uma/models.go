@@ -35,7 +35,7 @@ func InvoiceToNip47Transaction(i umaauth.Invoice) *nip47.Nip47Transaction {
 		DescriptionHash: "",
 		Preimage:        preimage,
 		PaymentHash:     i.PaymentHash,
-		Amount:          int64(i.Amount),
+		Amount:          i.Amount,
 		FeesPaid:        0, // TODO: support fees
 		CreatedAt:       i.CreatedAt.Unix(),
 		ExpiresAt:       expiresAt,
