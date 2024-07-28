@@ -2,6 +2,7 @@ package nip47
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // TODO: move to models/Nip47
@@ -156,15 +157,15 @@ type Nip47FetchQuoteParams struct {
 }
 
 type Nip47Quote struct {
-	PaymentHash           string  `json:"payment_hash"`
-	ExpiresAt             int64   `json:"expires_at"`
-	Multiplier            float64 `json:"multiplier"`
-	SendingCurrencyCode   string  `json:"sending_currency_code"`
-	ReceivingCurrencyCode string  `json:"receiving_currency_code"`
-	Fee                   int64   `json:"fee"`
-	TotalReceivingAmount  int64   `json:"total_receiving_amount"`
-	TotalSendingAmount    int64   `json:"total_sending_amount"`
-	LockedCurrencySide    string  `json:"locked_currency_side"`
+	PaymentHash           string    `json:"payment_hash"`
+	ExpiresAt             time.Time `json:"expires_at"`
+	Multiplier            float64   `json:"multiplier"`
+	SendingCurrencyCode   string    `json:"sending_currency_code"`
+	ReceivingCurrencyCode string    `json:"receiving_currency_code"`
+	Fee                   int64     `json:"fee"`
+	TotalReceivingAmount  int64     `json:"total_receiving_amount"`
+	TotalSendingAmount    int64     `json:"total_sending_amount"`
+	LockedCurrencySide    string    `json:"locked_currency_side"`
 }
 
 type Nip47ExecuteQuoteParams struct {
