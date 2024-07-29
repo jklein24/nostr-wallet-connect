@@ -187,3 +187,10 @@ type Nip47PayToAddressResponse struct {
 	Preimage string      `json:"preimage"`
 	Quote    *Nip47Quote `json:"quote,omitempty"`
 }
+
+type Nip68AppIdentity struct {
+	Name                string   `json:"name"`
+	Image               *string  `json:"image,omitempty"`
+	Nip05               *string  `json:"nip05,omitempty"`
+	AllowedRedirectUris []string `json:"allowed_redirect_uris"`
+}
