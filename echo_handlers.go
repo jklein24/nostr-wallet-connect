@@ -60,6 +60,7 @@ func (svc *Service) RegisterSharedRoutes(e *echo.Echo, cookieStore *sessions.Coo
 	templates["about.html"] = template.Must(template.ParseFS(embeddedViews, "views/about.html", "views/layout.html"))
 	templates["404.html"] = template.Must(template.ParseFS(embeddedViews, "views/404.html", "views/layout.html"))
 	templates["lnd/index.html"] = template.Must(template.ParseFS(embeddedViews, "views/backends/lnd/index.html", "views/layout.html"))
+	templates["uma/index.html"] = template.Must(template.ParseFS(embeddedViews, "views/backends/uma/index.html", "views/layout.html"))
 	e.Renderer = &TemplateRegistry{
 		templates: templates,
 	}
@@ -211,7 +212,10 @@ func (svc *Service) IndexHandler(c echo.Context) error {
 	if user != nil {
 		return c.Redirect(302, "/apps")
 	}
-	return c.Render(http.StatusOK, fmt.Sprintf("%s/index.html", strings.ToLower(svc.cfg.LNBackendType)), map[string]interface{}{})
+	loginUrl := svc.cfg.UmaLoginUrl + "?redirect_uri=" + url.QueryEscape(svc.cfg.UmaRedirectUrl)
+	return c.Render(http.StatusOK, fmt.Sprintf("%s/index.html", strings.ToLower(svc.cfg.LNBackendType)), map[string]interface{}{
+		"LoginUrl": loginUrl,
+	})
 }
 
 func (svc *Service) AboutHandler(c echo.Context) error {
