@@ -20,7 +20,7 @@ require (
 	github.com/nbd-wtf/go-nostr v0.25.5
 	github.com/nbd-wtf/ln-decodepay v1.11.1
 	github.com/stretchr/testify v1.8.4
-	github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240728182558-9fe7d912627f
+	github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240903222830-14439dbbf960
 	golang.org/x/oauth2 v0.4.0
 	google.golang.org/grpc v1.53.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.47.0

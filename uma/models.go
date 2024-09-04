@@ -5,41 +5,34 @@ import (
 	"github.com/uma-universal-money-address/uma-auth-api/codegen/go/umaauth"
 )
 
-func InvoiceToNip47Transaction(i umaauth.Invoice) *nip47.Nip47Transaction {
-	var expiresAt *int64 = nil
-	if i.ExpiresAt != nil {
-		expiresAt = new(int64)
-		*expiresAt = i.ExpiresAt.Unix()
-	}
-
-	var settledAt *int64 = nil
-	if i.SettledAt != nil {
-		settledAt = new(int64)
-		*settledAt = i.SettledAt.Unix()
-	}
-
+func InvoiceToNip47Transaction(i umaauth.Transaction) *nip47.Nip47Transaction {
 	preimage := ""
 	if i.Preimage != nil {
 		preimage = *i.Preimage
 	}
 
 	memo := ""
-	if i.Memo != nil {
-		memo = *i.Memo
+	if i.Description != nil {
+		memo = *i.Description
+	}
+
+	descriptionHash := ""
+	if i.DescriptionHash != nil {
+		descriptionHash = *i.DescriptionHash
 	}
 
 	return &nip47.Nip47Transaction{
-		Type:            i.Type,
-		Invoice:         i.PaymentRequest,
+		Type:            string(i.Type),
+		Invoice:         *i.Invoice,
 		Description:     memo,
-		DescriptionHash: "",
+		DescriptionHash: descriptionHash,
 		Preimage:        preimage,
 		PaymentHash:     i.PaymentHash,
 		Amount:          i.Amount,
 		FeesPaid:        0, // TODO: support fees
-		CreatedAt:       i.CreatedAt.Unix(),
-		ExpiresAt:       expiresAt,
-		SettledAt:       settledAt,
+		CreatedAt:       i.CreatedAt,
+		ExpiresAt:       i.ExpiresAt,
+		SettledAt:       i.SettledAt,
 		Metadata:        i.Metadata,
 	}
 }
@@ -61,8 +54,8 @@ func ToNip47LookupUserResponse(r umaauth.LookupUserResponse) *nip47.Nip47LookupU
 			Name:                c.Name,
 			Symbol:              c.Symbol,
 			MillisatoshiPerUnit: float64(c.Multiplier),
-			MinSendable:         int64(c.Min),
-			MaxSendable:         int64(c.Max),
+			MinSendable:         c.Min,
+			MaxSendable:         c.Max,
 			Decimals:            int(c.Decimals),
 		}
 	}

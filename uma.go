@@ -137,7 +137,7 @@ func (svc *UmaNwcAdapterService) MakeInvoice(ctx context.Context, senderPubkey s
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &umaauth.Invoice{}
+		responsePayload := &umaauth.Transaction{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return nil, err
@@ -150,7 +150,7 @@ func (svc *UmaNwcAdapterService) MakeInvoice(ctx context.Context, senderPubkey s
 			"expiry":          expiry,
 			"appId":           app.ID,
 			"userId":          app.User.ID,
-			"paymentRequest":  responsePayload.PaymentRequest,
+			"paymentRequest":  responsePayload.Invoice,
 			"paymentHash":     responsePayload.PaymentHash,
 		}).Info("Make invoice successful")
 
@@ -169,7 +169,7 @@ func (svc *UmaNwcAdapterService) MakeInvoice(ctx context.Context, senderPubkey s
 		"appId":           app.ID,
 		"userId":          app.User.ID,
 		"APIHttpStatus":   resp.StatusCode,
-	}).Errorf("Make invoice failed %s", string(errorPayload.Message))
+	}).Errorf("Make invoice failed %s", errorPayload.Message)
 	return nil, errors.New(errorPayload.Message)
 }
 
@@ -219,7 +219,7 @@ func (svc *UmaNwcAdapterService) LookupInvoice(ctx context.Context, senderPubkey
 	}
 
 	if resp.StatusCode < 300 {
-		responsePayload := &umaauth.Invoice{}
+		responsePayload := &umaauth.Transaction{}
 		err = json.NewDecoder(resp.Body).Decode(responsePayload)
 		if err != nil {
 			return nil, err
@@ -229,7 +229,7 @@ func (svc *UmaNwcAdapterService) LookupInvoice(ctx context.Context, senderPubkey
 			"paymentHash":    paymentHash,
 			"appId":          app.ID,
 			"userId":         app.User.ID,
-			"paymentRequest": responsePayload.PaymentRequest,
+			"paymentRequest": responsePayload.Invoice,
 			"settled":        responsePayload.SettledAt != nil,
 		}).Info("Lookup invoice successful")
 
@@ -245,7 +245,7 @@ func (svc *UmaNwcAdapterService) LookupInvoice(ctx context.Context, senderPubkey
 		"appId":         app.ID,
 		"userId":        app.User.ID,
 		"APIHttpStatus": resp.StatusCode,
-	}).Errorf("Lookup invoice failed %s", string(errorPayload.Message))
+	}).Errorf("Lookup invoice failed %s", errorPayload.Message)
 	return nil, errors.New(errorPayload.Message)
 }
 
@@ -666,7 +666,7 @@ func (svc *UmaNwcAdapterService) ListTransactions(ctx context.Context, senderPub
 		return nil, err
 	}
 
-	var invoices []umaauth.Invoice
+	var invoices []umaauth.Transaction
 
 	if resp.StatusCode < 300 {
 		err = json.NewDecoder(resp.Body).Decode(&invoices)

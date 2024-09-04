@@ -944,6 +944,12 @@ github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-2024072008
 github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240720081114-4c7d05321a12/go.mod h1:ZQ/o211Jn/38BKASbtCmMVqSvFOFE5WbTQQglNaKrGI=
 github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240728182558-9fe7d912627f h1:GyWa7WuALDi/VStNWmESlUB8oijBvT/MGu2rygsRngI=
 github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240728182558-9fe7d912627f/go.mod h1:ZQ/o211Jn/38BKASbtCmMVqSvFOFE5WbTQQglNaKrGI=
+github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240822211004-9d838fd0c3c2 h1:UwBvrq30+XMan1H1TiKsyPQORJP6nzpVhaq2SxRjjiE=
+github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240822211004-9d838fd0c3c2/go.mod h1:ZQ/o211Jn/38BKASbtCmMVqSvFOFE5WbTQQglNaKrGI=
+github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240903203310-44aede50d38a h1:BYzVUVlHaaP/V6jio0ZiqFohJbff+4MXNA/o8xcjTtM=
+github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240903203310-44aede50d38a/go.mod h1:ZQ/o211Jn/38BKASbtCmMVqSvFOFE5WbTQQglNaKrGI=
+github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240903222830-14439dbbf960 h1:+S+5GCBCy6L3q5rJbHnobe5rxQnwDTsMYKUA4ghC+uE=
+github.com/uma-universal-money-address/uma-auth-api/codegen/go v0.0.0-20240903222830-14439dbbf960/go.mod h1:ZQ/o211Jn/38BKASbtCmMVqSvFOFE5WbTQQglNaKrGI=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.14.0/go.mod h1:ol1PCaL0dX20wC0htZ7sYCsvCYmrouYra0zHzaclZhE=
